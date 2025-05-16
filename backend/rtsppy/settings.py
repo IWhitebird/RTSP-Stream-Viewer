@@ -25,13 +25,15 @@ SECRET_KEY = 'django-insecure-i$6j5v512@wz9(oroawvz9tfj4(nzwr0i219fhzi4onvugnhd2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']  # Allow all hosts in development
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    "daphne",
+    'daphne',
+    'channels',
+    'stream',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,7 +41,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
-    'stream',
     'rest_framework',
     'drf_spectacular',
 ]
@@ -133,6 +134,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 
 # Channel layers for WebSockets
 CHANNEL_LAYERS = {

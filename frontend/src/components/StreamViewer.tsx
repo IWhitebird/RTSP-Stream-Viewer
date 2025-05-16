@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Play, Pause, RefreshCw, MoreVertical, Maximize, Minimize, Video, VideoOff } from 'lucide-react';
+import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff } from 'lucide-react';
 
 interface StreamViewerProps {
   streamId: string;
@@ -20,7 +20,7 @@ interface StreamFrame {
 const StreamViewer: React.FC<StreamViewerProps> = ({ 
   streamId, 
   streamName,
-  baseUrl = 'ws://localhost:8000' // Default to local development
+  baseUrl = 'ws://127.0.0.1:8000/ws' // Default to local development
 }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +69,8 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
     }
 
     // Create new WebSocket connection
-    const ws = new WebSocket(`${baseUrl}/ws/stream/${streamId}/`);
+    // Use path without ws/ prefix to match backend routes
+    const ws = new WebSocket(`${baseUrl}/stream/${streamId}/`);
     wsRef.current = ws;
 
     ws.onopen = () => {
