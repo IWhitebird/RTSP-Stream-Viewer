@@ -6,7 +6,7 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   
   return (
-    <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 backdrop-blur-sm bg-opacity-70 dark:bg-opacity-70 sticky top-0 z-10">
+    <header className="border-b  backdrop-blur-sm bg-opacity-70 dark:bg-opacity-70 sticky top-0 z-10">
       <div className="container flex h-14 max-w-screen-2xl items-center px-4">
         <div className="flex flex-1 items-center justify-between">
           <div className="flex items-center space-x-2">

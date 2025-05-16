@@ -235,40 +235,6 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
           )}
         </div>
       </CardContent>
-      <CardFooter className={cn(
-        "flex justify-between pt-2", 
-        fullHeight ? "bg-muted/40 absolute bottom-0 left-0 right-0" : ""
-      )}>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={togglePause}
-            disabled={!isConnected}
-            className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm"
-          >
-            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleReconnect}
-            disabled={isConnected}
-            className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={toggleFullscreen}
-          disabled={!currentFrame}
-          className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm"
-        >
-          {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-        </Button>
-      </CardFooter>
     </Card>
   );
 };
