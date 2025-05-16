@@ -28,6 +28,8 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
 }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  //Put data frames in a queue so we show smooth video.
+  const [frameQueue, setFrameQueue] = useState<string[]>([]);
   const [currentFrame, setCurrentFrame] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -47,24 +49,23 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
     };
   }, [streamId]);
 
-  // Calculate FPS
   useEffect(() => {
-    if (!lastFrameTime) return;
-    
-    frameTimesRef.current.push(lastFrameTime);
-    
-    // Keep only the last 10 frames for FPS calculation
-    if (frameTimesRef.current.length > 10) {
-      frameTimesRef.current.shift();
-    }
-    
-    if (frameTimesRef.current.length >= 2) {
-      const timeElapsed = frameTimesRef.current[frameTimesRef.current.length - 1] - frameTimesRef.current[0];
-      const frameCount = frameTimesRef.current.length - 1;
-      const calculatedFps = Math.round((frameCount / timeElapsed) * 1000);
-      setFps(calculatedFps);
-    }
-  }, [lastFrameTime]);
+    if (isPaused) return;
+  
+    const interval = setInterval(() => {
+      setFrameQueue(prevQueue => {
+        if (prevQueue.length === 0) return prevQueue;
+  
+        const [nextFrame, ...rest] = prevQueue;
+        setCurrentFrame(nextFrame);
+        setLastFrameTime(Date.now());
+        return rest;
+      });
+    }, 1000 / 15); // 15 FPS
+  
+    return () => clearInterval(interval);
+  }, []);
+  
 
   const connectWebSocket = () => {
     // Close existing connection if any
@@ -88,7 +89,27 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
         const data: StreamFrame = JSON.parse(event.data);
         
         if (!isPaused && data.type === 'stream_frame' && data.frame) {
-          setCurrentFrame(data.frame);
+          // data.frame is a base64 encoded string
+          // const frame = atob(data.frame);
+          // console.log(data.frame);
+          //a queue should hold only 10 frames 
+          // const currentFrameQueue = frameQueue;
+          // if(currentFrameQueue.length > 5) {
+          //   currentFrameQueue.shift();
+          // }
+          // currentFrameQueue.push(data.frame);
+          // setFrameQueue(currentFrameQueue);
+
+
+          setFrameQueue(prevQueue => {
+            const newQueue = [...prevQueue, data.frame!];
+            // Optional: Limit queue length to prevent memory bloating
+            if (newQueue.length > 15) newQueue.shift();
+            return newQueue;
+          });
+
+          // setCurrentFrame(data.frame);
+
           setLastFrameTime(Date.now());
         } else if (data.type === 'stream_error' && data.message) {
           setError(data.message);
@@ -214,13 +235,11 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
             className="relative bg-black/90 flex items-center justify-center h-full w-full overflow-hidden"
           >
             {currentFrame ? (
-              <div className="relative w-full h-full flex items-center justify-center">
-                <img 
-                  src={`data:image/jpeg;base64,${currentFrame}`} 
-                  alt="RTSP Stream" 
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
+              <img
+                src={`data:image/jpeg;base64,${currentFrame}`}
+                alt="RTSP Stream"
+                className="max-w-full max-h-full object-contain"
+              />
             ) : (
               <div className="flex flex-col items-center justify-center text-center text-foreground/50 p-4">
                 {error ? (
