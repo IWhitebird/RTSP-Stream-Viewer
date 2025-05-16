@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, Activity } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface StreamViewerProps {
   streamId: string;
   streamName: string;
   baseUrl?: string;
+  fullHeight?: boolean;
 }
 
 interface StreamFrame {
@@ -20,7 +22,8 @@ interface StreamFrame {
 const StreamViewer: React.FC<StreamViewerProps> = ({ 
   streamId, 
   streamName,
-  baseUrl = 'ws://127.0.0.1:8000/ws' // Default to local development
+  baseUrl = 'ws://127.0.0.1:8000/ws', // Default to local development
+  fullHeight = false
 }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,36 +159,58 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   }, []);
 
   return (
-    <Card ref={cardRef} className={`w-full transition-all ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''}`}>
-      <CardHeader className="pb-2">
+    <Card 
+      ref={cardRef} 
+      className={cn(
+        "w-full transition-all overflow-hidden", 
+        isFullscreen ? "fixed inset-0 z-50 rounded-none" : "",
+        fullHeight ? "h-full" : ""
+      )}
+    >
+      <CardHeader className={cn("pb-2", fullHeight ? "bg-muted/40" : "")}>
         <div className="flex justify-between items-center">
           <CardTitle className={`${isFullscreen ? 'text-2xl' : ''}`}>{streamName}</CardTitle>
           <div className="flex items-center gap-2">
             {fps !== null && isConnected && !isPaused && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                {fps} FPS
-              </span>
+              <Badge variant="outline" className="bg-green-50 text-green-900 dark:bg-green-900/20 dark:text-green-300 flex items-center gap-1">
+                <Activity className="h-3 w-3" />
+                <span>{fps} FPS</span>
+              </Badge>
             )}
-            <Badge variant={isConnected ? "success" : "destructive"}>
+            <Badge 
+              variant={isConnected ? "outline" : "outline"}
+              className={cn(
+                isConnected 
+                  ? "bg-green-50 text-green-900 dark:bg-green-900/20 dark:text-green-300 border-green-200" 
+                  : "bg-red-50 text-red-900 dark:bg-red-900/20 dark:text-red-300 border-red-200"
+              )}
+            >
               {isConnected ? "Connected" : "Disconnected"}
             </Badge>
           </div>
         </div>
-        {!isFullscreen && (
+        {!isFullscreen && !fullHeight && (
           <CardDescription className="text-xs truncate">
             Stream ID: {streamId}
           </CardDescription>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className={fullHeight ? "flex-1 p-0" : ""}>
         <div 
-          className={`relative bg-black aspect-video flex items-center justify-center rounded-md overflow-hidden ${isFullscreen ? 'h-[calc(100vh-130px)]' : ''}`}
+          className={cn(
+            "relative bg-black flex items-center justify-center rounded-md overflow-hidden", 
+            isFullscreen ? "h-[calc(100vh-130px)]" : "",
+            fullHeight ? "h-[calc(100%-80px)]" : "aspect-video"
+          )}
         >
           {currentFrame ? (
             <img 
               src={`data:image/jpeg;base64,${currentFrame}`} 
               alt="RTSP Stream" 
-              className={`w-full h-full ${isFullscreen ? 'object-contain' : 'object-cover'}`}
+              className={cn(
+                "w-full h-full", 
+                isFullscreen || fullHeight ? "object-contain" : "object-cover"
+              )}
             />
           ) : (
             <div className="flex flex-col items-center justify-center text-center text-gray-400 p-4">
@@ -204,19 +229,23 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
           )}
           
           {isPaused && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
               <Pause className="h-16 w-16 text-white" />
             </div>
           )}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between pt-2">
+      <CardFooter className={cn(
+        "flex justify-between pt-2", 
+        fullHeight ? "bg-muted/40 absolute bottom-0 left-0 right-0" : ""
+      )}>
         <div className="flex gap-2">
           <Button 
             variant="outline" 
             size="sm"
             onClick={togglePause}
             disabled={!isConnected}
+            className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm"
           >
             {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
           </Button>
@@ -225,6 +254,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
             size="sm"
             onClick={handleReconnect}
             disabled={isConnected}
+            className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm"
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -234,6 +264,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
           size="sm"
           onClick={toggleFullscreen}
           disabled={!currentFrame}
+          className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm"
         >
           {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
         </Button>

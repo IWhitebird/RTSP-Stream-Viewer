@@ -1,6 +1,6 @@
-import React from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import StreamManager from '../components/StreamManager';
+import StreamManager from '../components/stream/StreamManager';
+import { Header } from '../components/Header';
 
 export const Route = createFileRoute('/')({
   component: Index,
@@ -8,10 +8,10 @@ export const Route = createFileRoute('/')({
 
 function Index() {
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="py-8">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
+      <main className="flex-1">
         <StreamManager />
-      </div>
+      </main>
     </div>
   );
 }

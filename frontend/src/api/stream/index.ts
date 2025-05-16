@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from '@/cofig';
-import type { Stream } from '@/components/StreamManager';
+import type { Stream } from '@/components/stream/StreamManager';
 
 // API functions
 
