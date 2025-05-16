@@ -40,28 +40,29 @@ const StreamManager: React.FC = () => {
           <div className="text-muted-foreground">Loading streams...</div>
         </div>
       ) 
-      : isError ? (
-        <div className="space-y-4">
-          <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-200">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Failed to load streams</AlertTitle>
-            <AlertDescription>There was an error loading the streams. Please try refreshing.</AlertDescription>
-          </Alert>
-          <div className="text-center">
-            <Button 
-              onClick={() => refetch()} 
-              className="mr-2"
-            >
-              Refresh
-            </Button>
-            <AddStreamDialog trigger={
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Stream
-              </Button>
-            } />
-          </div>
-        </div>
-      ) : (
+      // : isError ? (
+      //   <div className="space-y-4">
+      //     <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-200">
+      //       <AlertCircle className="h-4 w-4" />
+      //       <AlertTitle>Failed to load streams</AlertTitle>
+      //       <AlertDescription>There was an error loading the streams. Please try refreshing.</AlertDescription>
+      //     </Alert>
+      //     <div className="text-center">
+      //       <Button 
+      //         onClick={() => refetch()} 
+      //         className="mr-2"
+      //       >
+      //         Refresh
+      //       </Button>
+      //       <AddStreamDialog trigger={
+      //         <Button>
+      //           <PlusCircle className="mr-2 h-4 w-4" /> Add New Stream
+      //         </Button>
+      //       } />
+      //     </div>
+      //   </div>
+      // ) 
+      : (
         <ResizablePanelGroup direction="horizontal" className="h-full rounded-lg border">
           <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-card">
             <StreamList 

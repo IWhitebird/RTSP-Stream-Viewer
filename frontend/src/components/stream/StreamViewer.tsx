@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ResizablePanel } from "../ui/resizable";
 
 interface StreamViewerProps {
   streamId: string;
@@ -159,83 +160,92 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   }, []);
 
   return (
-    <Card 
-      ref={cardRef} 
-      className={cn(
-        "w-full transition-all overflow-hidden", 
-        isFullscreen ? "fixed inset-0 z-50 rounded-none" : "",
-        fullHeight ? "h-full" : ""
-      )}
-    >
-      <CardHeader className={cn("pb-2", fullHeight ? "bg-muted/40" : "")}>
-        <div className="flex justify-between items-center">
-          <CardTitle className={`${isFullscreen ? 'text-2xl' : ''}`}>{streamName}</CardTitle>
-          <div className="flex items-center gap-2">
-            {fps !== null && isConnected && !isPaused && (
-              <Badge variant="outline" className="bg-green-50 text-green-900 dark:bg-green-900/20 dark:text-green-300 flex items-center gap-1">
-                <Activity className="h-3 w-3" />
-                <span>{fps} FPS</span>
-              </Badge>
-            )}
-            <Badge 
-              variant={isConnected ? "outline" : "outline"}
-              className={cn(
-                isConnected 
-                  ? "bg-green-50 text-green-900 dark:bg-green-900/20 dark:text-green-300 border-green-200" 
-                  : "bg-red-50 text-red-900 dark:bg-red-900/20 dark:text-red-300 border-red-200"
-              )}
-            >
-              {isConnected ? "Connected" : "Disconnected"}
-            </Badge>
-          </div>
-        </div>
-        {!isFullscreen && !fullHeight && (
-          <CardDescription className="text-xs truncate">
-            Stream ID: {streamId}
-          </CardDescription>
+    <ResizablePanel defaultSize={100}>
+      <Card 
+        ref={cardRef} 
+        className={cn(
+          "w-full h-full transition-all overflow-hidden border-none", 
+          isFullscreen ? "fixed inset-0 z-50 rounded-none" : ""
         )}
-      </CardHeader>
-      <CardContent className={fullHeight ? "flex-1 p-0" : ""}>
-        <div 
-          className={cn(
-            "relative bg-black flex items-center justify-center rounded-md overflow-hidden", 
-            isFullscreen ? "h-[calc(100vh-130px)]" : "",
-            fullHeight ? "h-[calc(100%-80px)]" : "aspect-video"
-          )}
-        >
-          {currentFrame ? (
-            <img 
-              src={`data:image/jpeg;base64,${currentFrame}`} 
-              alt="RTSP Stream" 
-              className={cn(
-                "w-full h-full", 
-                isFullscreen || fullHeight ? "object-contain" : "object-cover"
+      >
+        <CardHeader className="pb-2 bg-card/80 backdrop-blur-sm">
+          <div className="flex justify-between items-center">
+            <CardTitle className={`${isFullscreen ? 'text-2xl' : ''}`}>{streamName}</CardTitle>
+            <div className="flex items-center gap-2">
+              {fps !== null && isConnected && !isPaused && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  <span>{fps} FPS</span>
+                </Badge>
               )}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center text-gray-400 p-4">
-              {error ? (
-                <>
-                  <VideoOff className="h-12 w-12 mb-2 text-gray-500" />
-                  <p>{error}</p>
-                </>
-              ) : (
-                <>
-                  <Video className="h-12 w-12 mb-2 text-gray-500 animate-pulse" />
-                  <p>Waiting for stream...</p>
-                </>
-              )}
+              <Badge 
+                variant={isConnected ? "success" : "destructive"}
+              >
+                {isConnected ? "Connected" : "Disconnected"}
+              </Badge>
+              <Button variant="ghost" size="icon" onClick={toggleFullscreen}>
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={togglePause}
+              >
+                {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleReconnect}
+                disabled={isConnected && !error}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
+          </div>
+          {!isFullscreen && (
+            <CardDescription className="text-xs truncate">
+              Stream ID: {streamId}
+            </CardDescription>
           )}
-          
-          {isPaused && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
-              <Pause className="h-16 w-16 text-white" />
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="p-0 h-[calc(100%-60px)]">
+          <div 
+            className="relative bg-black/90 flex items-center justify-center h-full w-full overflow-hidden"
+          >
+            {currentFrame ? (
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img 
+                  src={`data:image/jpeg;base64,${currentFrame}`} 
+                  alt="RTSP Stream" 
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center text-foreground/50 p-4">
+                {error ? (
+                  <>
+                    <VideoOff className="h-12 w-12 mb-2" />
+                    <p>{error}</p>
+                  </>
+                ) : (
+                  <>
+                    <Video className="h-12 w-12 mb-2 animate-pulse" />
+                    <p>Waiting for stream...</p>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {isPaused && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                <Pause className="h-16 w-16 text-white" />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </ResizablePanel>
   );
 };
 
