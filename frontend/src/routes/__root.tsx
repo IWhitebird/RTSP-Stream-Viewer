@@ -20,7 +20,7 @@ export const Route = createRootRoute({
   component: () => (
     <>
       <QueryClientProvider client={queryClient}>
-      <Header />
+          <Header />
           <Outlet />
           <ReactQueryDevtools initialIsOpen={false} />
           <TanStackRouterDevtools />

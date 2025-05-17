@@ -54,7 +54,7 @@ const StreamList: React.FC<StreamListProps> = ({
         <div className="ml-2">
           <AddStreamDialog trigger={
             <Button variant="outline" size="sm" className="flex items-center">
-              <PlusCircle className="h-4 w-4 mr-1" /> Add Stream
+              <PlusCircle className="h-4 w-4 mr-1 " /> Add Stream
             </Button>
           } />
         </div>
