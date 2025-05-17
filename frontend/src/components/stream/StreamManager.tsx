@@ -50,7 +50,7 @@ const StreamManager: React.FC = () => {
               setSelectedStream={setSelectedStream}
               displayedStreams={displayedStreams}
               setDisplayedStreams={setDisplayedStreams}
-              streams={streams}
+              // streams={streams}
             />
           </ResizablePanel>
           

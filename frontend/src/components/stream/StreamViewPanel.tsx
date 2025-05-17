@@ -5,7 +5,6 @@ import { PlusCircle, AlertCircle } from 'lucide-react';
 import StreamViewer from './StreamViewer';
 import AddStreamDialog from './AddStreamDialog';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../ui/resizable';
-import { ScrollArea } from '../ui/scroll-area';
 import type { Stream } from '@/query/stream';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
@@ -16,7 +15,7 @@ interface StreamViewPanelProps {
   displayedStreams: Stream[];
   setDisplayedStreams: (streams: Stream[]) => void;
 
-  streams: Stream[];
+  // streams: Stream[];
 }
 
 // Helper component for rendering a single stream within a resizable panel
@@ -49,7 +48,7 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
   setSelectedStream,
   setDisplayedStreams,
   displayedStreams,
-  streams = [],
+  // streams = [],
 }) => {
   // Array of stream IDs to display in the panel
 
