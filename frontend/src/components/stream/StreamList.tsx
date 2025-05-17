@@ -116,7 +116,7 @@ const StreamList: React.FC<StreamListProps> = ({
                   key={stream.id}
                   className={`p-3 rounded-md border cursor-pointer ${selectedStream === stream.id ? 'border-primary' : ''
                     }`}
-                  onClick={() => stream.is_active && onSelectStream(stream.id)}
+                  onClick={() => onSelectStream(stream.id)}
                 >
                   <div className="flex justify-between items-center mb-2">
                     <div className="font-medium">{stream.name}</div>

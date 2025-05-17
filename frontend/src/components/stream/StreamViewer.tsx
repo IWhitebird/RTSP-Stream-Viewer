@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, Activity } from 'lucide-react';
+import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, Activity, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ResizablePanel } from "../ui/resizable";
 
@@ -11,6 +11,7 @@ interface StreamViewerProps {
   streamName: string;
   baseUrl?: string;
   fullHeight?: boolean;
+  removeStream: () => void;
 }
 
 interface StreamFrame {
@@ -24,6 +25,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   streamId, 
   streamName,
   baseUrl = 'ws://127.0.0.1:8000/ws', // Default to local development
+  removeStream,
   fullHeight = false
 }) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -79,6 +81,8 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
     wsRef.current = ws;
 
     ws.onopen = () => {
+      setFrameQueue([]);
+      setCurrentFrame(null);
       setIsConnected(true);
       setError(null);
       frameTimesRef.current = [];
@@ -221,6 +225,13 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
                 disabled={isConnected && !error}
               >
                 <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={removeStream}
+              >
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
