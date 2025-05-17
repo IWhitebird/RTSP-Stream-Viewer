@@ -68,9 +68,9 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
 
   const connectWebSocket = () => {
     // Close existing connection if any
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
+    // if (wsRef.current) {
+    //   wsRef.current.close();
+    // }
 
     // Create new WebSocket connection
     // Use path without ws/ prefix to match backend routes
@@ -125,6 +125,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   };
 
   const handleReconnect = () => {
+    disconnectWebSocket();
     connectWebSocket();
   };
 

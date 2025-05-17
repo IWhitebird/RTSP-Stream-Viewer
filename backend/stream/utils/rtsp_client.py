@@ -46,9 +46,6 @@ class RTSPClient:
         with self.lock:
             self.client_count += 1
             logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
-            # Send last frame to new client if available
-            # if self.frame_buffer:
-            #     self._send_cached_frame()
     
     def remove_client(self):
         """Decrement client count and stop stream if no clients remain"""
@@ -96,21 +93,6 @@ class RTSPClient:
         with self.lock:
             self.client_count = 0
             self._stop_stream()
-            
-    # def _send_cached_frame(self):
-    #     """Send the cached frame to the group"""
-    #     if self.frame_buffer:
-    #         try:
-    #             async_to_sync(self.channel_layer.group_send)(
-    #                 self.group_name,
-    #                 {
-    #                     "type": "stream_frame",
-    #                     "frame": self.frame_buffer,
-    #                     "stream_id": self.stream_id
-    #                 }
-    #             )
-    #         except Exception as e:
-    #             logger.error(f"Error sending cached frame: {str(e)}")
         
     def _stream_loop(self):
         logger.info(f"Starting optimized stream loop for {self.stream_id}")
@@ -127,16 +109,16 @@ class RTSPClient:
         base_command = [
             "ffmpeg",
             "-rtsp_transport", "",  # To be filled dynamically
-            # "-fflags", "nobuffer",
+            "-fflags", "nobuffer",
             "-flags", "low_delay",
             "-hwaccel", "auto",     # Hardware acceleration
-            # "-threads", str(thread_count),  # Limit threads
+            "-threads", str(thread_count),  # Limit threads
             "-i", self.url,
             "-an",                  # Disable audio
             "-f", "mjpeg",
             "-q:v", "1",            # Slightly lower quality (1-31, lower is better)
             "-vf", f"scale=640:-1,fps={self.fps}",  # Lower resolution and FPS
-            # "-vsync", "passthrough",
+            "-vsync", "passthrough",
             "-flush_packets", "1",
             "-"
         ]

@@ -73,7 +73,6 @@ class RTSPConsumer(AsyncWebsocketConsumer):
         self.stream_id = self.scope['url_route']['kwargs']['stream_id']
         self.group_name = f'stream_{self.stream_id}'
         
-        # Join group
         await self.channel_layer.group_add(
             self.group_name,
             self.channel_name
@@ -82,25 +81,22 @@ class RTSPConsumer(AsyncWebsocketConsumer):
         await self.accept()
         logger.info(f'Client connected to stream {self.stream_id}')
         
-        # Get the stream details
-        # stream = await self.get_stream(self.stream_id)
-        stream = await sync_to_async(Stream.objects.get)(id=self.stream_id, is_active=True)
+        try:
+            stream = await sync_to_async(Stream.objects.get)(id=self.stream_id, is_active=True)
+        except Stream.DoesNotExist:
+            stream = None
+        
+        # If stream exists, add client to existing stream or start a new stream
         if stream:
-            # Get manager
             manager = await sync_to_async(StreamManager)()
-            
-            # Check if stream is active
             is_active = await sync_to_async(manager.is_stream_active)(self.stream_id)
-            
             if is_active:
-                # Just add this client to existing stream
                 await sync_to_async(manager.add_client_to_stream)(self.stream_id)
                 await self.send(text_data=json.dumps({
                     'type': 'status',
                     'message': 'Joining existing stream'
                 }))
             else:
-                # Start a new stream
                 await sync_to_async(manager.start_stream)(
                     self.stream_id, 
                     stream.url, 
