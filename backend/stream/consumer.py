@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger('rtsp_consumer')
 
 # Simple global dict to track active streams
-active_streams = {}
+active_streams : dict[str, RTSPClient] = {}
 streams_lock = threading.Lock()
 
 # Background task to clean up streams that should be removed
@@ -90,8 +90,13 @@ class RTSPConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """Handle new client connection"""
         logger.info('RTSP Consumer connect initiated')
+        
         self.stream_id = self.scope['url_route']['kwargs']['stream_id']
+
         self.group_name = f'stream_{self.stream_id}'
+
+        client_id = self.scope['client'][1]
+        print(f"RTSP Consumer connect initiated for stream {client_id}")
         
         await self.channel_layer.group_add(
             self.group_name,
@@ -112,13 +117,21 @@ class RTSPConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
         
-        client = RTSPClient(self.stream_id, url, self.group_name)
-        active_streams[self.stream_id] = client
-        client.start()
-        await self.send(text_data=json.dumps({
+        if self.stream_id in active_streams:
+            client = active_streams[self.stream_id]
+            client.add_client()
+            await self.send(text_data=json.dumps({
                 'type': 'status',
-                'message': 'Started new stream'
+                'message': 'Joined existing stream'
             }))
+        else:
+            client = RTSPClient(self.stream_id, url, self.group_name)
+            active_streams[self.stream_id] = client
+            client.start()
+            await self.send(text_data=json.dumps({
+                    'type': 'status',
+                    'message': 'Started new stream'
+                }))
             
         # Make sure cleanup task is running
         for task in asyncio.all_tasks():
@@ -145,8 +158,10 @@ class RTSPConsumer(AsyncWebsocketConsumer):
                 if self.stream_id in active_streams:
                     client = active_streams[self.stream_id]
                     client.remove_client()
-                    # Stream cleanup happens automatically inside RTSPClient
-                    
+                    with client.lock:
+                        if client.client_count == 0:
+                            del active_streams[self.stream_id]
+                
         await sync_to_async(remove_client)()
         logger.info(f'Client disconnected from stream {self.stream_id}')
     
@@ -197,3 +212,4 @@ class RTSPConsumer(AsyncWebsocketConsumer):
             }))
         except Exception as e:
             logger.error(f"Error sending error to client: {str(e)}")
+        

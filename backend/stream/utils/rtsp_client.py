@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import threading
 import time
@@ -53,53 +54,9 @@ class RTSPClient:
         with self.lock:
             if self.client_count > 0:
                 self.client_count -= 1
-            
             logger.info(f"Client left stream {self.stream_id} - Remaining clients: {self.client_count}")
-            
-            # Don't stop immediately - use a delayed shutdown
-            if self.client_count == 0 and self.is_running:
-                # Start a thread to wait and then stop if no new clients join
-                shutdown_thread = threading.Thread(target=self._delayed_shutdown)
-                shutdown_thread.daemon = True
-                shutdown_thread.start()
+        self._shutdown()
     
-    def _delayed_shutdown(self, delay=10):
-        """Wait for a period before shutting down to avoid rapid start/stop cycles"""
-        time.sleep(delay)
-        with self.lock:
-            if self.client_count == 0 and self.is_running:
-                logger.info(f"No clients for {delay}s, stopping stream {self.stream_id}")
-                self._stop_stream()
-                
-                # Signal for cleanup in consumer
-                self.should_be_removed = True
-    
-    def _stop_stream(self):
-        """Internal method to actually stop the stream"""
-        self.is_running = False
-        if self.process:
-            try:
-                pgid = os.getpgid(self.process.pid)
-                os.killpg(pgid, signal.SIGTERM)
-            except:
-                try:
-                    self.process.terminate()
-                except:
-                    pass
-            self.process = None
-            logger.info(f"Stopped stream {self.stream_id}")
-        
-        # Don't join the thread - let it terminate naturally
-        self.thread = None
-        
-        # Signal for cleanup
-        self.should_be_removed = True
-    
-    def stop(self):
-        """External method to force stop the stream regardless of client count"""
-        with self.lock:
-            self.client_count = 0
-            self._stop_stream()
         
     def _stream_loop(self):
         logger.info(f"Starting optimized stream loop for {self.stream_id}")
@@ -169,8 +126,7 @@ class RTSPClient:
         if not success:
             logger.error("All transport protocols failed")
             self._send_error("All transport protocols failed")
-            with self.lock:
-                self.is_running = False
+            self._shutdown()
             return
 
         # Binary frame processing variables
@@ -247,10 +203,37 @@ class RTSPClient:
                 # Don't crash on errors, just log and continue
                 time.sleep(0.5)
 
-        # Cleanup
-        self._terminate_ffmpeg()
-        logger.info(f"Stream loop ended for {self.stream_id}")
+        self._shutdown()
 
+
+
+    def _shutdown(self, delay=2):
+        """Wait for a period before shutting down to avoid rapid start/stop cycles"""
+        time.sleep(delay)
+        logger.info(f"Shutting down stream {self.stream_id} in {delay}s")
+        with self.lock:
+            logger.info(f"Client count: {self.client_count} and is running: {self.is_running}")
+            if self.client_count == 0:
+                logger.info(f"No clients for {delay}s, stopping stream {self.stream_id}")
+                self._stop_stream()
+                
+    
+    def _stop_stream(self):
+        """Internal method to actually stop the stream"""
+        self.is_running = False
+        if self.process:
+            try:
+                pgid = os.getpgid(self.process.pid)
+                os.killpg(pgid, signal.SIGTERM)
+            except:
+                try:
+                    self.process.terminate()
+                except:
+                    pass
+            self.process = None
+            
+            logger.info(f"Stopped stream {self.stream_id}")
+    
     def _send_frame(self, encoded_frame):
         """Send an encoded frame to all clients in the group"""
         try:
@@ -293,40 +276,3 @@ class RTSPClient:
             )
         except Exception as e:
             logger.error(f"Error sending error message: {str(e)}")
-
-    def _terminate_ffmpeg(self):
-        """Properly terminate the FFmpeg process"""
-        if self.process:
-            try:
-                # Try to kill the process group
-                try:
-                    pgid = os.getpgid(self.process.pid)
-                    os.killpg(pgid, signal.SIGTERM)
-                except:
-                    # Fallback
-                    self.process.terminate()
-                    
-                # Wait for termination
-                wait_sec = 3
-                for _ in range(wait_sec):
-                    if self.process.poll() is not None:
-                        break
-                    time.sleep(0.5)
-                else:
-                    # Force kill if not terminated
-                    try:
-                        pgid = os.getpgid(self.process.pid)
-                        os.killpg(pgid, signal.SIGKILL)
-                    except:
-                        self.process.kill()
-                        
-                # Close pipes
-                if self.process.stdout:
-                    self.process.stdout.close()
-                if self.process.stderr:
-                    self.process.stderr.close()
-                    
-            except Exception as e:
-                logger.error(f"FFmpeg termination error: {str(e)}")
-            finally:
-                self.process = None
