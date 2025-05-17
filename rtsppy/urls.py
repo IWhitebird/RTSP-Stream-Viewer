@@ -25,8 +25,9 @@ from django.views.static import serve
 # Create a router for REST API
 router = DefaultRouter()
 router.register(r'streams', StreamViewSet)
+FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ui', 'dist')
 
-FRONTEND_DIST = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
+print("AYOAYOAYOAOY" , FRONTEND_DIST)
 
 
 urlpatterns = [

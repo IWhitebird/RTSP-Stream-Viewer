@@ -23,7 +23,7 @@ interface StreamFrame {
 const StreamViewer: React.FC<StreamViewerProps> = ({ 
   streamId, 
   streamName,
-  baseUrl = 'ws://127.0.0.1:8000/ws', // Default to local development
+  baseUrl = 'ws://localhost:8000/ws',
   removeStream
 }) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -33,7 +33,6 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   const [currentFrame, setCurrentFrame] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [, setLastFrameTime] = useState<number | null>(null);
   const [showControls, setShowControls] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -46,18 +45,17 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
     return () => {
       disconnectWebSocket();
     };
-  }, [streamId]);
+  }, []);
 
   useEffect(() => {
     if (isPaused) return;
   
     const interval = setInterval(() => {
       setFrameQueue(prevQueue => {
-        if (prevQueue.length === 0) return prevQueue;
+        if (prevQueue.length < 1) return prevQueue;
   
         const [nextFrame, ...rest] = prevQueue;
         setCurrentFrame(nextFrame);
-        setLastFrameTime(Date.now());
         return rest;
       });
     }, 1000 / STREAM_FRAMES.current);
@@ -68,9 +66,9 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
 
   const connectWebSocket = () => {
     // Close existing connection if any
-    // if (wsRef.current) {
-    //   wsRef.current.close();
-    // }
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
 
     // Create new WebSocket connection
     // Use path without ws/ prefix to match backend routes
@@ -89,15 +87,13 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
       try {
         const data: StreamFrame = JSON.parse(event.data);
         
-        if (!isPaused && data.type === 'stream_frame' && data.frame) {
+        if (data.type === 'stream_frame' && data.frame) {
           setFrameQueue(prevQueue => {
             const newQueue = [...prevQueue, data.frame!];
             // Optional: Limit queue length to prevent memory bloating
             if (newQueue.length > STREAM_FRAMES.current) newQueue.shift();
             return newQueue;
           });
-
-          setLastFrameTime(Date.now());
         } else if (data.type === 'stream_error' && data.message) {
           setError(data.message);
         }
@@ -125,7 +121,11 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   };
 
   const handleReconnect = () => {
-    disconnectWebSocket();
+    // setFrameQueue([]);
+    // setCurrentFrame(null);
+    // setIsConnected(false);
+    // setError(null);
+    // disconnectWebSocket();
     connectWebSocket();
   };
 
@@ -227,12 +227,12 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {STREAM_FRAMES.current !== null && isConnected && !isPaused && (
+                {/* {STREAM_FRAMES.current !== null && isConnected && !isPaused && (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     <Activity className="h-3 w-3" />
                     <span>{STREAM_FRAMES.current} FPS</span>
                   </Badge>
-                )}
+                )} */}
                 <Badge 
                   variant={isConnected ? "success" : "destructive"}
                 >

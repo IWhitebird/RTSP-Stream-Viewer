@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import threading
 import time
@@ -8,7 +7,6 @@ import signal
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 import logging
-import importlib
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -27,35 +25,30 @@ class RTSPClient:
         self.last_frame_time = 0
         self.fps = 15
         self.frame_buffer = None  # Store last frame for new clients
-        self.lock = threading.Lock()  # For thread safety
         
     def start(self):
-        with self.lock:
-            self.client_count += 1
-            logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
-            
-            if self.is_running:
-                return  # Stream already running
-            
-            self.is_running = True
-            self.thread = threading.Thread(target=self._stream_loop)
-            self.thread.daemon = True
-            self.thread.start()
-            logger.info(f"Started stream {self.stream_id}")
+        self.client_count += 1
+        logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
+        
+        if self.is_running:
+            return  # Stream already running
+        
+        self.is_running = True
+        self.thread = threading.Thread(target=self._stream_loop)
+        self.thread.daemon = True
+        self.thread.start()
+        logger.info(f"Started stream {self.stream_id}")
     
     def add_client(self):
         """Increment client count without starting the stream if already running"""
-        with self.lock:
-            self.client_count += 1
-            logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
+        self.client_count += 1
+        logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
     
     def remove_client(self):
         """Decrement client count and stop stream if no clients remain"""
-        with self.lock:
-            if self.client_count > 0:
-                self.client_count -= 1
-            logger.info(f"Client left stream {self.stream_id} - Remaining clients: {self.client_count}")
-        self._shutdown()
+        if self.client_count > 0:
+            self.client_count -= 1
+        logger.info(f"Client left stream {self.stream_id} - Remaining clients: {self.client_count}")
     
         
     def _stream_loop(self):
@@ -124,8 +117,8 @@ class RTSPClient:
                 continue
 
         if not success:
-            logger.error("All transport protocols failed")
-            self._send_error("All transport protocols failed")
+            logger.error("Ffmpeg not able to connect to the RTMP server using , " + str(transport_types))
+            self._send_error("Ffmpeg not able to connect to the RTMP server using , " + str(transport_types))
             self._shutdown()
             return
 
@@ -144,8 +137,7 @@ class RTSPClient:
             # print("Stream loop running")
             try:
                 # Check if we have clients before processing
-                with self.lock:
-                    has_clients = self.client_count > 0
+                has_clients = self.client_count > 0
                     
                 if not has_clients:
                     # No clients, sleep to reduce CPU usage but keep stream active
@@ -187,8 +179,7 @@ class RTSPClient:
                     if elapsed >= frame_interval:
                         # Encode and cache the frame
                         encoded = base64.b64encode(frame).decode('ascii')
-                        with self.lock:
-                            self.frame_buffer = encoded
+                        self.frame_buffer = encoded
                         # Only send if we have clients
                         if has_clients:
                             self._send_frame(encoded)
@@ -209,13 +200,12 @@ class RTSPClient:
 
     def _shutdown(self, delay=2):
         """Wait for a period before shutting down to avoid rapid start/stop cycles"""
-        time.sleep(delay)
+        # time.sleep(delay)
         logger.info(f"Shutting down stream {self.stream_id} in {delay}s")
-        with self.lock:
-            logger.info(f"Client count: {self.client_count} and is running: {self.is_running}")
-            if self.client_count == 0:
-                logger.info(f"No clients for {delay}s, stopping stream {self.stream_id}")
-                self._stop_stream()
+        logger.info(f"Client count: {self.client_count} and is running: {self.is_running}")
+        if self.client_count == 0:
+            logger.info(f"No clients for {delay}s, stopping stream {self.stream_id}")
+        self._stop_stream()
                 
     
     def _stop_stream(self):
