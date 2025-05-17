@@ -4,7 +4,13 @@ import json
 from .utils.stream_manager import StreamManager
 from .models import Stream
 from asgiref.sync import sync_to_async
-   
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('rtsp_consumer')
+
+
 class StreamStatusConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         # Get the stream_id from URL if provided (optional parameter)
@@ -62,7 +68,8 @@ class StreamStatusConsumer(AsyncWebsocketConsumer):
 
 class RTSPConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        print('RTSP Consumer connect')
+        """Handle new client connection"""
+        logger.info('RTSP Consumer connect initiated')
         self.stream_id = self.scope['url_route']['kwargs']['stream_id']
         self.group_name = f'stream_{self.stream_id}'
         
@@ -73,77 +80,105 @@ class RTSPConsumer(AsyncWebsocketConsumer):
         )
 
         await self.accept()
+        logger.info(f'Client connected to stream {self.stream_id}')
         
-        # Get the stream details and start streaming
-        stream = await self.get_stream(self.stream_id)
+        # Get the stream details
+        # stream = await self.get_stream(self.stream_id)
+        stream = await sync_to_async(Stream.objects.get)(id=self.stream_id, is_active=True)
         if stream:
-            manager = StreamManager()
-            if not manager.is_stream_active(self.stream_id):
+            # Get manager
+            manager = await sync_to_async(StreamManager)()
+            
+            # Check if stream is active
+            is_active = await sync_to_async(manager.is_stream_active)(self.stream_id)
+            
+            if is_active:
+                # Just add this client to existing stream
+                await sync_to_async(manager.add_client_to_stream)(self.stream_id)
+                await self.send(text_data=json.dumps({
+                    'type': 'status',
+                    'message': 'Joining existing stream'
+                }))
+            else:
+                # Start a new stream
                 await sync_to_async(manager.start_stream)(
                     self.stream_id, 
                     stream.url, 
                     self.group_name
                 )
+                await self.send(text_data=json.dumps({
+                    'type': 'status',
+                    'message': 'Starting new stream'
+                }))
         else:
             await self.send(text_data=json.dumps({
                 'type': 'error',
                 'message': 'Stream not found'
             }))
+            await self.close()
     
-    async def disconnect(self, close_code):
+    async def disconnect(self , close_code):
+        """Handle client disconnection"""
+        logger.info(f'Client disconnecting from stream {self.stream_id}')
+        
         # Leave room group
         await self.channel_layer.group_discard(
             self.group_name,
             self.channel_name
         )
         
-        # Check if this is the last client, if so stop the stream
-        group_size = await self.get_group_size()
-        if group_size == 0:
-            manager = StreamManager()
-            await sync_to_async(manager.stop_stream)(self.stream_id)
+        # Notify manager of client departure
+        manager = await sync_to_async(StreamManager)()
+        await sync_to_async(manager.remove_client_from_stream)(self.stream_id)
+        
+        logger.info(f'Client disconnected from stream {self.stream_id}')
     
-    async def get_group_size(self):
-        # This is a simplified approach - in production you'd want a more robust way
-        # to track the number of clients in a group
-        # For demo purposes we'll stop the stream on any disconnect
-        return 0
     
-    @sync_to_async
-    def get_stream(self, stream_id):
-        try:
-            return Stream.objects.get(id=stream_id, is_active=True)
-        except Stream.DoesNotExist:
-            return None
-    
-    # Receive message from WebSocket
     async def receive(self, text_data):
+        """Handle client sending messages"""
         try:
             text_data_json = json.loads(text_data)
             message_type = text_data_json.get('type')
             
-            if message_type == 'start_stream':
-                # Logic to start a stream if it was stopped
-                pass
-            elif message_type == 'stop_stream':
-                # Logic to pause a stream
-                pass
+            if message_type == 'ping':
+                # Simple keepalive response
+                await self.send(text_data=json.dumps({
+                    'type': 'pong'
+                }))
+            
         except json.JSONDecodeError:
             pass
     
-    # Receive message from room group
+
     async def stream_frame(self, event):
-        # Send frame to WebSocket
-        await self.send(text_data=json.dumps({
-            'type': 'stream_frame',
-            'frame': event['frame'],
-            'stream_id': event['stream_id']
-        }))
+        """Send a video frame to the client"""
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'stream_frame',
+                'frame': event['frame'],
+                'stream_id': event['stream_id']
+            }))
+        except Exception as e:
+            logger.error(f"Error sending frame to client: {str(e)}")
     
-    # Handle stream errors
+    async def stream_status(self, event):
+        """Send status message to client"""
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'stream_status',
+                'message': event['message'],
+                'stream_id': event['stream_id']
+            }))
+        except Exception as e:
+            logger.error(f"Error sending status to client: {str(e)}")
+    
     async def stream_error(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'stream_error',
-            'message': event['message'],
-            'stream_id': event['stream_id']
-        }))
+        """Send error message to client"""
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'stream_error',
+                'message': event['message'],
+                'stream_id': event['stream_id']
+            }))
+        except Exception as e:
+            logger.error(f"Error sending error to client: {str(e)}")

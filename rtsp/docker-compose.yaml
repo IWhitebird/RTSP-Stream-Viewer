@@ -5,6 +5,7 @@
 version: "3.3"
 services:
   rtsp-server:
+    image: bluenviron/mediamtx
     restart: unless-stopped
     ports:
       - "1935:1935"
@@ -12,7 +13,6 @@ services:
       - "8888:8888"
     environment:
       - RTSP_PROTOCOLS=tcp
-    image: bluenviron/mediamtx
 
   #  webcam:
   #    restart: unless-stopped

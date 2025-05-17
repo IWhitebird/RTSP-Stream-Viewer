@@ -2,24 +2,16 @@ import React, { useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../ui/resizable';
-import { useStreams } from '@/query/stream';
+import { useStreams, type Stream } from '@/query/stream';
 import StreamList from './StreamList';
 import StreamViewPanel from './StreamViewPanel';
 
 const StreamManager: React.FC = () => {
-  const [selectedStream, setSelectedStream] = useState<string | null>(null);
+  const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
+  const [displayedStreams, setDisplayedStreams] = useState<Stream[]>([]);
 
   // Fetch streams using the custom hook
-  const { data: streams = [], isLoading, isError, error, refetch } = useStreams();
-
-
-  const handleSelectStream = (streamId: string | null) => {
-    console.log(streamId)
-    setSelectedStream(streamId);
-  }
-
-  // Get the selected stream data
-  const selectedStreamData = streams.find(stream => stream.id === selectedStream);
+  const { data: streams = [], isLoading, error, refetch } = useStreams();
 
   return (
     <div className="p-2 h-[calc(100vh-3.5rem)]">
@@ -42,9 +34,11 @@ const StreamManager: React.FC = () => {
           <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-card">
             <StreamList 
               streams={streams}
+              onRefresh={refetch}
               selectedStream={selectedStream}
-              onSelectStream={handleSelectStream}
-              isLoading={isLoading}
+              onSelectStream={setSelectedStream}
+              displayedStreams={displayedStreams}
+              setDisplayedStreams={setDisplayedStreams}
             />
           </ResizablePanel>
           
@@ -52,13 +46,11 @@ const StreamManager: React.FC = () => {
           
           <ResizablePanel defaultSize={75}>
             <StreamViewPanel 
-              selectedStream={selectedStreamData || null}
+              selectedStream={selectedStream}
               setSelectedStream={setSelectedStream}
-              onRefresh={refetch}
-              isLoading={isLoading}
+              displayedStreams={displayedStreams}
+              setDisplayedStreams={setDisplayedStreams}
               streams={streams}
-              isError={isError}
-              error={error?.message || null}
             />
           </ResizablePanel>
           

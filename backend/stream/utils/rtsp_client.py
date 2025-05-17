@@ -2,10 +2,15 @@ import base64
 import threading
 import time
 import subprocess
-import json
 import os
+import signal
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('rtsp_client')
 
 class RTSPClient:
     def __init__(self, stream_id, url, group_name):
@@ -16,237 +21,107 @@ class RTSPClient:
         self.thread = None
         self.process = None
         self.channel_layer = get_channel_layer()
+        self.client_count = 0
+        self.last_frame_time = 0
+        self.fps = 15
+        self.frame_buffer = None  # Store last frame for new clients
+        self.lock = threading.Lock()  # For thread safety
         
     def start(self):
-        if self.is_running:
-            return
-        
-        self.is_running = True
-        self.thread = threading.Thread(target=self._stream_loop)
-        self.thread.daemon = True
-        self.thread.start()
-        
-    def stop(self):
+        with self.lock:
+            self.client_count += 1
+            logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
+            
+            if self.is_running:
+                return  # Stream already running
+            
+            self.is_running = True
+            self.thread = threading.Thread(target=self._stream_loop)
+            self.thread.daemon = True
+            self.thread.start()
+            logger.info(f"Started stream {self.stream_id}")
+    
+    def add_client(self):
+        """Increment client count without starting the stream if already running"""
+        with self.lock:
+            self.client_count += 1
+            logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
+            # Send last frame to new client if available
+            if self.frame_buffer:
+                self._send_cached_frame()
+    
+    def remove_client(self):
+        """Decrement client count and stop stream if no clients remain"""
+        with self.lock:
+            if self.client_count > 0:
+                self.client_count -= 1
+            
+            logger.info(f"Client left stream {self.stream_id} - Remaining clients: {self.client_count}")
+            
+            # Don't stop immediately - use a delayed shutdown
+            if self.client_count == 0 and self.is_running:
+                # Start a thread to wait and then stop if no new clients join
+                shutdown_thread = threading.Thread(target=self._delayed_shutdown)
+                shutdown_thread.daemon = True
+                shutdown_thread.start()
+    
+    def _delayed_shutdown(self, delay=10):
+        """Wait for a period before shutting down to avoid rapid start/stop cycles"""
+        time.sleep(delay)
+        with self.lock:
+            if self.client_count == 0 and self.is_running:
+                logger.info(f"No clients for {delay}s, stopping stream {self.stream_id}")
+                self._stop_stream()
+    
+    def _stop_stream(self):
+        """Internal method to actually stop the stream"""
         self.is_running = False
         if self.process:
             try:
-                self.process.terminate()
+                pgid = os.getpgid(self.process.pid)
+                os.killpg(pgid, signal.SIGTERM)
             except:
-                pass
+                try:
+                    self.process.terminate()
+                except:
+                    pass
             self.process = None
-        if self.thread:
-            self.thread.join(timeout=1.0)
-            
-    # def _stream_loop(self):
-
-    #     print("Starting stream loop")
-    #     # Try both TCP and UDP transports
-    #     transport = 'udp'
-    #     success = False
-      
-    #     # FFmpeg command with more resilient options
-    #     # command = [
-    #     #     'ffmpeg',
-    #     #     '-rtsp_transport', transport,  # Try both TCP and UDP
-    #     #     '-stimeout', '5000000',        # Increase socket timeout (5 seconds)
-    #     #     '-i', self.url,                # Input RTSP URL
-    #     #     '-an',                         # Disable audio
-    #     #     '-f', 'image2pipe',            # Output format
-    #     #     '-pix_fmt', 'yuv420p',         # Pixel format
-    #     #     '-vcodec', 'mjpeg',            # Output codec
-    #     #     '-q:v', '5',                   # Quality (1-31, 1 is highest)
-    #     #     '-vf', 'fps=15',               # Lower framerate for more stability
-    #     #     '-'                            # Output to pipe
-    #     # ]
-
-    #     command = [
-    #         "ffmpeg",
-    #         "-rtsp_transport", transport,
-    #         "-i", self.url,
-    #         "-an",
-    #         "-f", "mjpeg",
-    #         "-q:v", "5",
-    #         "-vf", "fps=15",
-    #         "-"
-    #     ]
+            logger.info(f"Stopped stream {self.stream_id}")
         
-    #     # Notify about connection attempt
-    #     async_to_sync(self.channel_layer.group_send)(
-    #         self.group_name,
-    #         {
-    #             "type": "stream_error",
-    #             "message": f"Connecting to stream using {transport.upper()}...",
-    #             "stream_id": self.stream_id
-    #         }
-    #     )
-        
-    #     try:
-    #         print("Starting FFmpeg process")
-    #         self.process = subprocess.Popen(
-    #             command,
-    #             stdout=subprocess.PIPE,
-    #             stderr=subprocess.PIPE,
-    #             bufsize=10**8
-    #         )
-            
-    #         # Check if process started successfully by reading initial output
-    #         time.sleep(5)
-    #         if self.process.poll() is not None:
-    #             # Process already terminated
-    #             error_output = self.process.stderr.read().decode('utf-8', errors='ignore')
-    #             if error_output:
-    #                 async_to_sync(self.channel_layer.group_send)(
-    #                     self.group_name,
-    #                     {
-    #                         "type": "stream_error",
-    #                         "message": f"FFmpeg error with {transport}: {error_output[:200]}",
-    #                         "stream_id": self.stream_id
-    #                     }
-    #                 )
-            
-    #         # Process started successfully
-    #         success = True
-            
-    #     except Exception as e:
-    #         print(f"Error starting FFmpeg process: {str(e)}")
-    #         async_to_sync(self.channel_layer.group_send)(
-    #             self.group_name,
-    #             {
-    #                 "type": "stream_error",
-    #                 "message": f"Failed to start FFmpeg process: {str(e)}",
-    #                 "stream_id": self.stream_id
-    #             }
-    #         )
+        # Don't join the thread - let it terminate naturally
+        self.thread = None
     
-    #     if not success:
-    #         async_to_sync(self.channel_layer.group_send)(
-    #             self.group_name,
-    #             {
-    #                 "type": "stream_error",
-    #                 "message": f"Failed to connect to RTSP stream: {self.url}. Please check if the URL is correct and the stream is active.",
-    #                 "stream_id": self.stream_id
-    #             }
-    #         )
-    #         return
+    def stop(self):
+        """External method to force stop the stream regardless of client count"""
+        with self.lock:
+            self.client_count = 0
+            self._stop_stream()
             
-    #     # Buffer for reading JPEG frames
-    #     buffer = bytearray()
-    #     jpeg_start = bytes([0xFF, 0xD8])
-    #     jpeg_end = bytes([0xFF, 0xD9])
+    def _send_cached_frame(self):
+        """Send the cached frame to the group"""
+        if self.frame_buffer:
+            try:
+                async_to_sync(self.channel_layer.group_send)(
+                    self.group_name,
+                    {
+                        "type": "stream_frame",
+                        "frame": self.frame_buffer,
+                        "stream_id": self.stream_id
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error sending cached frame: {str(e)}")
         
-    #     # Notify about successful connection
-    #     async_to_sync(self.channel_layer.group_send)(
-    #         self.group_name,
-    #         {
-    #             "type": "stream_error",
-    #             "message": f"Connected to stream successfully",
-    #             "stream_id": self.stream_id
-    #         }
-    #     )
-        
-    #     consecutive_errors = 0
-    #     while self.is_running:
-    #         try:
-    #             # Check if process is still running
-    #             if self.process.poll() is not None:
-    #                 async_to_sync(self.channel_layer.group_send)(
-    #                     self.group_name,
-    #                     {
-    #                         "type": "stream_error",
-    #                         "message": f"FFmpeg process terminated unexpectedly",
-    #                         "stream_id": self.stream_id
-    #                     }
-    #                 )
-    #                 break
-                    
-    #             # Read chunk from ffmpeg's stdout with timeout
-    #             chunk = self.process.stdout.read(8192)
-    #             if not chunk:
-    #                 # End of stream or error
-    #                 consecutive_errors += 1
-    #                 if consecutive_errors > 10:
-    #                     async_to_sync(self.channel_layer.group_send)(
-    #                         self.group_name,
-    #                         {
-    #                             "type": "stream_error",
-    #                             "message": f"No data received from stream for too long",
-    #                             "stream_id": self.stream_id
-    #                         }
-    #                     )
-    #                     break
-    #                 time.sleep(0.5)
-    #                 continue
-                
-    #             consecutive_errors = 0
-    #             buffer.extend(chunk)
-                
-    #             # Find JPEG boundaries
-    #             start_idx = buffer.find(jpeg_start)
-    #             if start_idx == -1:
-    #                 # No start marker found, keep last 1024 bytes and discard the rest
-    #                 if len(buffer) > 1024:
-    #                     buffer = buffer[-1024:]
-    #                 continue
-                    
-    #             end_idx = buffer.find(jpeg_end, start_idx)
-    #             if end_idx == -1:
-    #                 # No end marker found, keep accumulating data
-    #                 # But prevent buffer from growing too large
-    #                 if len(buffer) > 1_000_000:  # 1MB limit
-    #                     buffer = buffer[start_idx:]
-    #                 continue
-                    
-    #             # Extract complete JPEG frame
-    #             jpeg_data = buffer[start_idx:end_idx+2]
-    #             buffer = buffer[end_idx+2:]
-                
-    #             # Ensure we have a valid JPEG (minimum size check)
-    #             if len(jpeg_data) < 100:
-    #                 continue
-                
-    #             # Convert to base64 string for WebSocket transport
-    #             base64_image = base64.b64encode(jpeg_data).decode('utf-8')
-                
-    #             # Send frame to WebSocket group
-    #             async_to_sync(self.channel_layer.group_send)(
-    #                 self.group_name,
-    #                 {
-    #                     "type": "stream_frame",
-    #                     "frame": base64_image,
-    #                     "stream_id": self.stream_id
-    #                 }
-    #             )
-                
-    #             # Control frame rate (adjusted to match vf fps setting)
-    #             time.sleep(0.066)  # ~15 FPS
-                
-    #         except Exception as e:
-    #             consecutive_errors += 1
-    #             async_to_sync(self.channel_layer.group_send)(
-    #                 self.group_name,
-    #                 {
-    #                     "type": "stream_error",
-    #                     "message": f"Error processing stream: {str(e)}",
-    #                     "stream_id": self.stream_id
-    #                 }
-    #             )
-    #             if consecutive_errors > 5:
-    #                 break
-    #             time.sleep(1)
-        
-    #     if self.process:
-    #         try:
-    #             self.process.terminate()
-    #         except:
-    #             pass
-    #         self.process = None 
-
-
     def _stream_loop(self):
-        print("Starting optimized stream loop")
-        # transport_types = ['udp', 'tcp']  # Test UDP first, then TCP
-        transport_types = ['tcp']  # Test UDP first, then TCP
+        logger.info(f"Starting optimized stream loop for {self.stream_id}")
+        
+        # Try TCP first as it's more reliable for most RTSP servers
+        transport_types = ['tcp', 'udp']  
         success = False
+        
+        # Resource usage optimizations
+        cpu_count = os.cpu_count() or 4  # Get CPU count or default to 2
+        thread_count = max(1, min(cpu_count // 2, 4))  # Use at most half of CPUs, max 4
         
         # Optimized FFmpeg command for low latency streaming
         base_command = [
@@ -254,37 +129,44 @@ class RTSPClient:
             "-rtsp_transport", "",  # To be filled dynamically
             "-fflags", "nobuffer",
             "-flags", "low_delay",
-            "-hwaccel", "auto",     # Use hardware acceleration if available
+            "-hwaccel", "auto",     # Hardware acceleration
+            "-threads", str(thread_count),  # Limit threads
             "-i", self.url,
             "-an",                  # Disable audio
             "-f", "mjpeg",
-            "-q:v", "3",           # Slightly better quality
-            "-vf", "fps=15",
+            "-q:v", "5",            # Slightly lower quality (1-31, lower is better)
+            "-vf", f"scale=640:-1,fps={self.fps}",  # Lower resolution and FPS
             "-vsync", "passthrough",
             "-flush_packets", "1",
             "-"
         ]
 
+        # Prioritize TCP as it's more reliable for RTSP
         for transport in transport_types:
+            if not self.is_running:
+                break
+                
             command = base_command.copy()
             command[command.index("-rtsp_transport") + 1] = transport
-
+            
             # Notify connection attempt
             self._send_status(f"Connecting via {transport.upper()}...")
             
             try:
+                # Use process group to ensure we can kill ffmpeg and all its children
                 self.process = subprocess.Popen(
                     command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    bufsize=1<<18  # 256KB buffer
+                    bufsize=1<<20,  # 1MB buffer
+                    preexec_fn=os.setsid  # Create new process group
                 )
                 
                 # Give FFmpeg time to initialize
-                for _ in range(5):
-                    if self.process.poll() is not None:
+                for _ in range(3):
+                    if not self.is_running or self.process.poll() is not None:
                         break
-                    time.sleep(1)
+                    time.sleep(0.5)
                 else:
                     success = True
                     break
@@ -295,21 +177,34 @@ class RTSPClient:
 
         if not success:
             self._send_error("All transport protocols failed")
+            with self.lock:
+                self.is_running = False
             return
 
         # Binary frame processing variables
         jpeg_start = memoryview(b'\xff\xd8')
         jpeg_end = memoryview(b'\xff\xd9')
         buffer = bytearray()
-        max_buffer_size = 5 * 1024 * 1024  # 5MB max buffer
-
-        # Direct binary frame sending (no base64)
-        frame_count = 0
-        start_time = time.time()
+        max_buffer_size = 2 * 1024 * 1024  # 2MB max buffer
         
+        # Frame rate control
+        frame_interval = 1.0 / self.fps
+        last_frame_time = time.time()
+        
+        # Send frames only when clients are connected
         while self.is_running:
+            # print("Stream loop running")
             try:
-                # Read larger chunks for efficiency
+                # Check if we have clients before processing
+                with self.lock:
+                    has_clients = self.client_count > 0
+                    
+                if not has_clients:
+                    # No clients, sleep to reduce CPU usage but keep stream active
+                    time.sleep(0.5)
+                    continue
+                    
+                # Read from ffmpeg only when we have clients
                 chunk = self.process.stdout.read(65536)
                 if not chunk:
                     if self.process.poll() is not None:
@@ -321,10 +216,9 @@ class RTSPClient:
                 
                 # Prevent buffer overflow
                 if len(buffer) > max_buffer_size:
-                    self._send_warning("Buffer overflow detected")
-                    buffer.clear()
-                    continue
-
+                    buffer = buffer[-max_buffer_size:]  # Keep the last part
+                
+                # Extract complete frames
                 while True:
                     start_pos = buffer.find(jpeg_start)
                     if start_pos == -1:
@@ -338,69 +232,109 @@ class RTSPClient:
                     frame = buffer[start_pos:end_pos+2]
                     del buffer[:end_pos+2]
                     
-                    # Send frame directly as binary
-                    self._send_frame(frame)
+                    # Check if enough time has passed since last frame
+                    current_time = time.time()
+                    elapsed = current_time - last_frame_time
                     
-                    # Maintain target FPS
-                    frame_count += 1
-                    elapsed = time.time() - start_time
-                    target_time = frame_count / 15
-                    if elapsed < target_time:
-                        time.sleep(target_time - elapsed)
+                    if elapsed >= frame_interval:
+                        # Encode and cache the frame
+                        encoded = base64.b64encode(frame).decode('ascii')
+                        with self.lock:
+                            self.frame_buffer = encoded
+                        # Only send if we have clients
+                        if has_clients:
+                            self._send_frame(encoded)
+                            
+                        last_frame_time = current_time
+                    else:
+                        # Skip this frame to maintain target FPS
+                        pass
 
             except Exception as e:
-                self._send_error(f"Processing error: {str(e)}")
-                time.sleep(1)  # Prevent tight error loop
+                logger.error(f"Stream processing error: {str(e)}")
+                # Don't crash on errors, just log and continue
+                time.sleep(0.5)
 
         # Cleanup
         self._terminate_ffmpeg()
+        logger.info(f"Stream loop ended for {self.stream_id}")
 
-    def _send_frame(self, frame_data):
-        encoded = base64.b64encode(frame_data).decode('ascii')
-        async_to_sync(self.channel_layer.group_send)(
-            self.group_name,
-            {
-                "type": "stream_frame",
-                "frame": encoded,
-                "stream_id": self.stream_id
-            }
-        )
-
+    def _send_frame(self, encoded_frame):
+        """Send an encoded frame to all clients in the group"""
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                self.group_name,
+                {
+                    "type": "stream_frame",
+                    "frame": encoded_frame,
+                    "stream_id": self.stream_id
+                }
+            )
+            self.last_frame_time = time.time()
+        except Exception as e:
+            logger.error(f"Error sending frame: {str(e)}")
 
     def _send_status(self, message):
-        async_to_sync(self.channel_layer.group_send)(
-            self.group_name,
-            {
-                "type": "stream_error",
-                "message": message,
-                "stream_id": self.stream_id
-            }
-        )
+        """Send status message to clients"""
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                self.group_name,
+                {
+                    "type": "stream_status",
+                    "message": message,
+                    "stream_id": self.stream_id
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error sending status: {str(e)}")
 
     def _send_error(self, message):
-        async_to_sync(self.channel_layer.group_send)(
-            self.group_name,
-            {
-                "type": "stream_error",
-                "message": message,
-                "stream_id": self.stream_id
-            }
-        )
+        """Send error message to clients"""
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                self.group_name,
+                {
+                    "type": "stream_error",
+                    "message": message,
+                    "stream_id": self.stream_id
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error sending error message: {str(e)}")
 
     def _terminate_ffmpeg(self):
+        """Properly terminate the FFmpeg process"""
         if self.process:
             try:
-                self.process.stdout.close()
-                self.process.stderr.close()
-                self.process.terminate()
-                wait_sec = 5
+                # Try to kill the process group
+                try:
+                    pgid = os.getpgid(self.process.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                except:
+                    # Fallback
+                    self.process.terminate()
+                    
+                # Wait for termination
+                wait_sec = 3
                 for _ in range(wait_sec):
                     if self.process.poll() is not None:
                         break
-                    time.sleep(1)
+                    time.sleep(0.5)
                 else:
-                    self.process.kill()
+                    # Force kill if not terminated
+                    try:
+                        pgid = os.getpgid(self.process.pid)
+                        os.killpg(pgid, signal.SIGKILL)
+                    except:
+                        self.process.kill()
+                        
+                # Close pipes
+                if self.process.stdout:
+                    self.process.stdout.close()
+                if self.process.stderr:
+                    self.process.stderr.close()
+                    
             except Exception as e:
-                print(f"Cleanup error: {str(e)}")
+                logger.error(f"FFmpeg termination error: {str(e)}")
             finally:
                 self.process = None

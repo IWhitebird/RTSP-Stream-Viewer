@@ -3,23 +3,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Play, Pause, Trash2, PlusCircle } from 'lucide-react';
+import { Play, Pause, Trash2, PlusCircle, CircleX } from 'lucide-react';
 import { useToggleStreamActive, useDeleteStream } from '@/query/stream';
 import type { Stream } from '@/query/stream';
 import AddStreamDialog from './AddStreamDialog';
 
 interface StreamListProps {
   streams: Stream[];
-  selectedStream: string | null;
-  onSelectStream: (streamId: string) => void;
-  isLoading: boolean;
+  onRefresh: () => void;
+  selectedStream: Stream | null;
+  onSelectStream: (stream: Stream) => void;
+  displayedStreams: Stream[];
+  setDisplayedStreams: (streams: Stream[]) => void;
 }
 
 const StreamList: React.FC<StreamListProps> = ({
   streams,
+  onRefresh,
   selectedStream,
   onSelectStream,
-  isLoading
+  displayedStreams,
+  setDisplayedStreams,
 }) => {
   const toggleActiveMutation = useToggleStreamActive();
   const deleteMutation = useDeleteStream();
@@ -29,6 +33,12 @@ const StreamList: React.FC<StreamListProps> = ({
   const handleToggleStreamActive = (stream: Stream, activate: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
     toggleActiveMutation.mutate({ streamId: stream.id, activate });
+    onRefresh();
+    if (activate) {
+      setDisplayedStreams([...displayedStreams, stream]);
+    } else {
+      setDisplayedStreams(displayedStreams.filter(s => s.id !== stream.id));
+    }
   };
 
   const handleDeleteStream = (streamId: string, e: React.MouseEvent) => {
@@ -36,6 +46,8 @@ const StreamList: React.FC<StreamListProps> = ({
     if (window.confirm('Are you sure you want to delete this stream?')) {
       deleteMutation.mutate(streamId);
     }
+    setDisplayedStreams(displayedStreams.filter(s => s.id !== streamId));
+    onRefresh();
   };
 
   const addButtonTrigger = (
@@ -68,7 +80,7 @@ const StreamList: React.FC<StreamListProps> = ({
                 <div
                   key={stream.id}
                   className="p-3 rounded-md border cursor-pointer"
-                  onClick={() => onSelectStream(stream.id)}
+                  onClick={() => onSelectStream(stream)}
                 >
                   <div className="flex justify-between items-center mb-2">
                     <div className="font-medium">{stream.name}</div>
@@ -85,7 +97,7 @@ const StreamList: React.FC<StreamListProps> = ({
                       disabled={toggleActiveMutation.isPending}
                       className="h-8 px-2"
                     >
-                      <Pause className="h-3.5 w-3.5 mr-1" /> Pause
+                      <CircleX className="h-3.5 w-3.5 mr-1" /> Deactivate
                     </Button>
                     <Button
                       variant="ghost"
@@ -114,9 +126,9 @@ const StreamList: React.FC<StreamListProps> = ({
               {streams.map(stream => (
                 <div
                   key={stream.id}
-                  className={`p-3 rounded-md border cursor-pointer ${selectedStream === stream.id ? 'border-primary' : ''
+                  className={`p-3 rounded-md border cursor-pointer ${selectedStream?.id === stream.id ? 'border-primary' : ''
                     }`}
-                  onClick={() => onSelectStream(stream.id)}
+                  onClick={() => onSelectStream(stream)}
                 >
                   <div className="flex justify-between items-center mb-2">
                     <div className="font-medium">{stream.name}</div>

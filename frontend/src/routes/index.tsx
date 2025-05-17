@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
 import StreamManager from '../components/stream/StreamManager';
-import { Header } from '../components/Header';
 
 export const Route = createFileRoute('/')({
   component: Index,

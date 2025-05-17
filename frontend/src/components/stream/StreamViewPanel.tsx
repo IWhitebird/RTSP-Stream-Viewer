@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { RefreshCcw, Settings, Info, PlusCircle, X, AlertCircle } from 'lucide-react';
+import { PlusCircle, AlertCircle } from 'lucide-react';
 import StreamViewer from './StreamViewer';
 import AddStreamDialog from './AddStreamDialog';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../ui/resizable';
@@ -12,25 +11,23 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface StreamViewPanelProps {
   selectedStream: Stream | null;
-  setSelectedStream: (stream: string | null) => void;
-  onRefresh: () => void;
-  isLoading: boolean;
+  setSelectedStream: (streams: Stream | null) => void;
+
+  displayedStreams: Stream[];
+  setDisplayedStreams: (streams: Stream[]) => void;
+
   streams: Stream[];
-  isError: boolean;
-  error: string | null;
 }
 
 const StreamViewPanel: React.FC<StreamViewPanelProps> = ({ 
   selectedStream, 
   setSelectedStream,
-  onRefresh,
-  isLoading,
+  setDisplayedStreams,
+  displayedStreams,
   streams = [],
-  isError,
-  error
 }) => {
   // Array of stream IDs to display in the panel
-  const [displayedStreams, setDisplayedStreams] = useState<Stream[]>([]);
+
   const [layoutError, setLayoutError] = useState<string | null>(null);
 
   // Add selected stream to the displayed streams
@@ -46,7 +43,7 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
     
     if (!displayedStreams.some(s => s.id === stream.id)) {
       setDisplayedStreams([...displayedStreams, stream]);
-      setSelectedStream(stream.id);
+      setSelectedStream(stream);
     }
   };
 
@@ -84,47 +81,21 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
     </div>
   );
 
-  const StreamSelector = () => (
-    <div className="p-2 bg-card border-b flex items-center justify-between">
-      <h3 className="text-sm font-medium">Displayed Streams ({displayedStreams.length}/4)</h3>
-      <div className="flex gap-2">
-        <ScrollArea className="max-w-[300px]">
-          <div className="flex gap-1">
-            {streams
-              .filter(stream => stream.is_active && !displayedStreams.some(s => s.id === stream.id))
-              .map(stream => (
-                <Button 
-                  key={stream.id} 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => addStreamToView(stream)}
-                  className="whitespace-nowrap"
-                  disabled={displayedStreams.length >= 4}
-                >
-                  <PlusCircle className="h-3 w-3 mr-1" /> {stream.name}
-                </Button>
-              ))}
-          </div>
-        </ScrollArea>
-      </div>
-    </div>
-  );
-
   // Render the appropriate layout based on number of streams
   const renderStreamLayout = () => {
     switch (displayedStreams.length) {
       case 1:
         // Single stream, full width
-        return (
-          <div className="h-full">
-            <StreamViewer 
-              streamId={displayedStreams[0].id} 
-              streamName={displayedStreams[0].name}
-              removeStream={() => removeStreamFromView(displayedStreams[0].id)}
-              fullHeight
-            />
-          </div>
-        );
+        // return (
+        //   <div className="h-full">
+        //     <StreamViewer 
+        //       streamId={displayedStreams[0].id} 
+        //       streamName={displayedStreams[0].name}
+        //       removeStream={() => removeStreamFromView(displayedStreams[0].id)}
+        //       fullHeight
+        //     />
+        //   </div>
+        // );
         
       case 2:
         // Two streams side by side
@@ -148,7 +119,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                       streamId={stream.id} 
                       streamName={stream.name}
                       removeStream={() => removeStreamFromView(stream.id)}
-                      fullHeight
                     />
                   </div>
                 </ResizablePanel>
@@ -184,7 +154,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                     streamId={displayedStreams[0].id} 
                     streamName={displayedStreams[0].name}
                     removeStream={() => removeStreamFromView(displayedStreams[0].id)}
-                    fullHeight
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
@@ -198,7 +167,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                     streamId={displayedStreams[1].id} 
                     streamName={displayedStreams[1].name}
                     removeStream={() => removeStreamFromView(displayedStreams[1].id)}
-                    fullHeight
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>
@@ -213,7 +181,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                 streamId={displayedStreams[2].id} 
                 streamName={displayedStreams[2].name}
                 removeStream={() => removeStreamFromView(displayedStreams[2].id)}
-                fullHeight
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -246,7 +213,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                     streamId={displayedStreams[0].id} 
                     streamName={displayedStreams[0].name}
                     removeStream={() => removeStreamFromView(displayedStreams[0].id)}
-                    fullHeight
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
@@ -260,7 +226,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                     streamId={displayedStreams[1].id} 
                     streamName={displayedStreams[1].name}
                     removeStream={() => removeStreamFromView(displayedStreams[1].id)}
-                    fullHeight
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>
@@ -286,7 +251,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                     streamId={displayedStreams[2].id} 
                     streamName={displayedStreams[2].name}
                     removeStream={() => removeStreamFromView(displayedStreams[2].id)}
-                    fullHeight
                   />
                 </ResizablePanel>
                 <ResizableHandle withHandle />
@@ -300,7 +264,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
                     streamId={displayedStreams[3].id} 
                     streamName={displayedStreams[3].name}
                     removeStream={() => removeStreamFromView(displayedStreams[3].id)}
-                    fullHeight
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>
@@ -312,8 +275,6 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
         return <NoStreamsView />;
     }
   };
-
-  console.log(displayedStreams)
 
   return (
     <>
@@ -328,7 +289,7 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
         
         {displayedStreams.length > 0 ? (
           <>
-            <StreamSelector />
+            <h3 className="text-sm font-medium">Displayed Streams ({displayedStreams.length}/4)</h3>
             {renderStreamLayout()}
           </>
         ) : (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardDescription, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, Activity, X } from 'lucide-react';
@@ -10,7 +10,6 @@ interface StreamViewerProps {
   streamId: string;
   streamName: string;
   baseUrl?: string;
-  fullHeight?: boolean;
   removeStream: () => void;
 }
 
@@ -25,28 +24,25 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   streamId, 
   streamName,
   baseUrl = 'ws://127.0.0.1:8000/ws', // Default to local development
-  removeStream,
-  fullHeight = false
+  removeStream
 }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   //Put data frames in a queue so we show smooth video.
-  const [frameQueue, setFrameQueue] = useState<string[]>([]);
+  const [, setFrameQueue] = useState<string[]>([]);
   const [currentFrame, setCurrentFrame] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [lastFrameTime, setLastFrameTime] = useState<number | null>(null);
-  const [fps, setFps] = useState<number | null>(null);
+  const [, setLastFrameTime] = useState<number | null>(null);
   const [showControls, setShowControls] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const frameTimesRef = useRef<number[]>([]);
 
-  useEffect(() => {
-    // Connect to WebSocket when component mounts
-    connectWebSocket();
+  const STREAM_FRAMES = useRef(15);
 
-    // Clean up WebSocket connection when component unmounts
+  useEffect(() => {
+    connectWebSocket();
     return () => {
       disconnectWebSocket();
     };
@@ -64,7 +60,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
         setLastFrameTime(Date.now());
         return rest;
       });
-    }, 1000 / 15); // 15 FPS
+    }, 1000 / STREAM_FRAMES.current);
   
     return () => clearInterval(interval);
   }, []);
@@ -94,26 +90,12 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
         const data: StreamFrame = JSON.parse(event.data);
         
         if (!isPaused && data.type === 'stream_frame' && data.frame) {
-          // data.frame is a base64 encoded string
-          // const frame = atob(data.frame);
-          // console.log(data.frame);
-          //a queue should hold only 10 frames 
-          // const currentFrameQueue = frameQueue;
-          // if(currentFrameQueue.length > 5) {
-          //   currentFrameQueue.shift();
-          // }
-          // currentFrameQueue.push(data.frame);
-          // setFrameQueue(currentFrameQueue);
-
-
           setFrameQueue(prevQueue => {
             const newQueue = [...prevQueue, data.frame!];
             // Optional: Limit queue length to prevent memory bloating
-            if (newQueue.length > 15) newQueue.shift();
+            if (newQueue.length > STREAM_FRAMES.current) newQueue.shift();
             return newQueue;
           });
-
-          // setCurrentFrame(data.frame);
 
           setLastFrameTime(Date.now());
         } else if (data.type === 'stream_error' && data.message) {
@@ -190,25 +172,25 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
       <Card 
         ref={cardRef} 
         className={cn(
-          "min-w-full min-h-full transition-all overflow-hidden border-none bg-black", 
+          "min-w-full min-h-full transition-all overflow-hidden border-none ", 
           isFullscreen ? "fixed inset-0 z-50 rounded-none" : ""
         )}
       >
         <div 
-          className="relative bg-black/90 flex items-center justify-center h-full w-full overflow-hidden"
+          className="relative flex items-center justify-center h-full w-full overflow-hidden aspect-video "
           onMouseEnter={() => setShowControls(true)}
           onMouseLeave={() => setShowControls(false)}
         >
-          {currentFrame ? (
+          {currentFrame && !isPaused ? (
             <img
               src={`data:image/jpeg;base64,${currentFrame}`}
               alt="RTSP Stream"
               className="max-w-full max-h-full object-contain"
             />
           ) : (
-            <div className="flex flex-col items-center justify-center text-center text-foreground/50 p-4">
+            <div className="flex flex-col items-center justify-center text-center text-foreground/50 p-4 w-full h-full">
               {error ? (
-                <div className=" flex flex-col items-center justify-center text-center text-foreground/50 p-4">
+                <div className="flex flex-col items-center justify-center text-center text-foreground/50 p-4">
                   <VideoOff className="mb-2" />
                   <p>{error}</p>
                 </div>
@@ -244,10 +226,10 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {fps !== null && isConnected && !isPaused && (
+                {STREAM_FRAMES.current !== null && isConnected && !isPaused && (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     <Activity className="h-3 w-3" />
-                    <span>{fps} FPS</span>
+                    <span>{STREAM_FRAMES.current} FPS</span>
                   </Badge>
                 )}
                 <Badge 
@@ -270,7 +252,6 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
                   variant="ghost" 
                   size="icon" 
                   onClick={handleReconnect}
-                  disabled={isConnected && !error}
                   className="text-white hover:bg-white/10"
                 >
                   <RefreshCw className="h-4 w-4" />
