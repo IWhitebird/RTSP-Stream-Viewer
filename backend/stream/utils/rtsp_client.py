@@ -47,8 +47,8 @@ class RTSPClient:
             self.client_count += 1
             logger.info(f"Client joined stream {self.stream_id} - Total clients: {self.client_count}")
             # Send last frame to new client if available
-            if self.frame_buffer:
-                self._send_cached_frame()
+            # if self.frame_buffer:
+            #     self._send_cached_frame()
     
     def remove_client(self):
         """Decrement client count and stop stream if no clients remain"""
@@ -97,26 +97,26 @@ class RTSPClient:
             self.client_count = 0
             self._stop_stream()
             
-    def _send_cached_frame(self):
-        """Send the cached frame to the group"""
-        if self.frame_buffer:
-            try:
-                async_to_sync(self.channel_layer.group_send)(
-                    self.group_name,
-                    {
-                        "type": "stream_frame",
-                        "frame": self.frame_buffer,
-                        "stream_id": self.stream_id
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Error sending cached frame: {str(e)}")
+    # def _send_cached_frame(self):
+    #     """Send the cached frame to the group"""
+    #     if self.frame_buffer:
+    #         try:
+    #             async_to_sync(self.channel_layer.group_send)(
+    #                 self.group_name,
+    #                 {
+    #                     "type": "stream_frame",
+    #                     "frame": self.frame_buffer,
+    #                     "stream_id": self.stream_id
+    #                 }
+    #             )
+    #         except Exception as e:
+    #             logger.error(f"Error sending cached frame: {str(e)}")
         
     def _stream_loop(self):
         logger.info(f"Starting optimized stream loop for {self.stream_id}")
         
         # Try TCP first as it's more reliable for most RTSP servers
-        transport_types = ['tcp', 'udp']  
+        transport_types = ['tcp']  
         success = False
         
         # Resource usage optimizations
@@ -127,16 +127,16 @@ class RTSPClient:
         base_command = [
             "ffmpeg",
             "-rtsp_transport", "",  # To be filled dynamically
-            "-fflags", "nobuffer",
+            # "-fflags", "nobuffer",
             "-flags", "low_delay",
             "-hwaccel", "auto",     # Hardware acceleration
-            "-threads", str(thread_count),  # Limit threads
+            # "-threads", str(thread_count),  # Limit threads
             "-i", self.url,
             "-an",                  # Disable audio
             "-f", "mjpeg",
-            "-q:v", "5",            # Slightly lower quality (1-31, lower is better)
+            "-q:v", "1",            # Slightly lower quality (1-31, lower is better)
             "-vf", f"scale=640:-1,fps={self.fps}",  # Lower resolution and FPS
-            "-vsync", "passthrough",
+            # "-vsync", "passthrough",
             "-flush_packets", "1",
             "-"
         ]
@@ -150,6 +150,7 @@ class RTSPClient:
             command[command.index("-rtsp_transport") + 1] = transport
             
             # Notify connection attempt
+            logger.info(f"Connecting via {transport.upper()}...")
             self._send_status(f"Connecting via {transport.upper()}...")
             
             try:
@@ -172,10 +173,12 @@ class RTSPClient:
                     break
 
             except Exception as e:
+                logger.error(f"Connection failed: {str(e)}")
                 self._send_error(f"Connection failed: {str(e)}")
                 continue
 
         if not success:
+            logger.error("All transport protocols failed")
             self._send_error("All transport protocols failed")
             with self.lock:
                 self.is_running = False
@@ -185,7 +188,7 @@ class RTSPClient:
         jpeg_start = memoryview(b'\xff\xd8')
         jpeg_end = memoryview(b'\xff\xd9')
         buffer = bytearray()
-        max_buffer_size = 2 * 1024 * 1024  # 2MB max buffer
+        max_buffer_size = 1 * 1024 * 1024  # 2MB max buffer
         
         # Frame rate control
         frame_interval = 1.0 / self.fps
