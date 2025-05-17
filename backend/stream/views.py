@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Stream
 from .serializers import StreamSerializer
-from .utils.stream_manager import StreamManager
+# from .utils.stream_manager import StreamManager
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 # Create your views here.
@@ -50,8 +50,8 @@ class StreamViewSet(viewsets.ModelViewSet):
         stream.save()
         
         # Stop the stream if it's running
-        manager = StreamManager()
-        manager.stop_stream(str(stream.id))
+        # manager = StreamManager()
+        # manager.stop_stream(str(stream.id))
         
         serializer = self.get_serializer(stream)
         return Response(serializer.data)

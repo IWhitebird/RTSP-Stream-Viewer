@@ -112,37 +112,10 @@ class RTSPConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
         
-        # Check if stream already exists
-        def manage_stream():
-            with streams_lock:
-                if self.stream_id in active_streams:
-                    # Check if stream is marked for removal
-                    if hasattr(active_streams[self.stream_id], 'should_be_removed') and active_streams[self.stream_id].should_be_removed:
-                        # Create a new instance if it was marked for removal
-                        client = RTSPClient(self.stream_id, url, self.group_name)
-                        active_streams[self.stream_id] = client
-                        client.start()
-                        return "new"
-                    else:
-                        active_streams[self.stream_id].add_client()
-                        return "existing"
-                else:
-                    # Create new RTSP client
-                    client = RTSPClient(self.stream_id, url, self.group_name)
-                    active_streams[self.stream_id] = client
-                    client.start()
-                    return "new"
-
-        # Add client to existing stream or start a new one
-        stream_status = await sync_to_async(manage_stream)()
-        
-        if stream_status == "existing":
-            await self.send(text_data=json.dumps({
-                'type': 'status',
-                'message': 'Joined existing stream'
-            }))
-        else:
-            await self.send(text_data=json.dumps({
+        client = RTSPClient(self.stream_id, url, self.group_name)
+        active_streams[self.stream_id] = client
+        client.start()
+        await self.send(text_data=json.dumps({
                 'type': 'status',
                 'message': 'Started new stream'
             }))

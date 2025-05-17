@@ -19,6 +19,31 @@ interface StreamViewPanelProps {
   streams: Stream[];
 }
 
+// Helper component for rendering a single stream within a resizable panel
+const StreamPanelItem: React.FC<{ stream: Stream | undefined; removeStream: (streamId: string) => void }> = ({ stream, removeStream }) => {
+  if (!stream) {
+    // This case should ideally not be hit if streamsToDisplay is managed correctly
+    return (
+      <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
+        <div className="relative h-full p-1 flex items-center justify-center text-muted-foreground">
+          Empty Panel
+        </div>
+      </ResizablePanel>
+    );
+  }
+  return (
+    <ResizablePanel defaultSize={50} collapsible={false} minSize={15} key={stream.id /* Add key here if mapping, or ensure parent does it */}>
+      <div className="relative h-full p-1">
+        <StreamViewer
+          streamId={stream.id}
+          streamName={stream.name}
+          removeStream={() => removeStream(stream.id)}
+        />
+      </div>
+    </ResizablePanel>
+  );
+};
+
 const StreamViewPanel: React.FC<StreamViewPanelProps> = ({ 
   selectedStream, 
   setSelectedStream,
@@ -43,24 +68,29 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
     
     if (!displayedStreams.some(s => s.id === stream.id)) {
       setDisplayedStreams([...displayedStreams, stream]);
-      setSelectedStream(stream);
+      setSelectedStream(stream); // Keep selected stream in sync
     }
   };
 
   // Remove a stream from the displayed streams
   const removeStreamFromView = (streamId: string) => {
-    setDisplayedStreams(displayedStreams.filter(s => s.id !== streamId));
-    setSelectedStream(null);
+    const newDisplayedStreams = displayedStreams.filter(s => s.id !== streamId);
+    setDisplayedStreams(newDisplayedStreams);
+    // If the removed stream was the selected one, or if no streams are left, set selected to null
+    // Or, select the last remaining stream if any.
+    if (selectedStream && selectedStream.id === streamId) {
+      setSelectedStream(newDisplayedStreams.length > 0 ? newDisplayedStreams[newDisplayedStreams.length - 1] : null);
+    } else if (newDisplayedStreams.length === 0) {
+      setSelectedStream(null);
+    }
   };
 
   // Add the selected stream to display if it's not already there
   React.useEffect(() => {
-    // if (selectedStream && !displayedStreams.some(s => s.id === selectedStream.id)) {
       if (selectedStream) {
         addStreamToView(selectedStream);
       }
-    // }
-  }, [selectedStream]);
+  }, [selectedStream]); // Dependency array should ideally include addStreamToView if it's not stable
 
   const NoStreamsView = () => (
     <div className="h-full flex items-center justify-center">
@@ -83,189 +113,78 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
 
   // Render the appropriate layout based on number of streams
   const renderStreamLayout = () => {
-    switch (displayedStreams.length) {
+    const streamsToDisplay = displayedStreams.slice(0, 4); // Ensure we only use up to 4 streams for layout
+
+    switch (streamsToDisplay.length) {
       case 1:
-        // Single stream, full width
-        // return (
-        //   <div className="h-full">
-        //     <StreamViewer 
-        //       streamId={displayedStreams[0].id} 
-        //       streamName={displayedStreams[0].name}
-        //       removeStream={() => removeStreamFromView(displayedStreams[0].id)}
-        //       fullHeight
-        //     />
-        //   </div>
-        // );
+        return (
+          <div className="flex-1 mt-2 h-full">
+            <StreamViewer 
+              streamId={streamsToDisplay[0].id} 
+              streamName={streamsToDisplay[0].name}
+              removeStream={() => removeStreamFromView(streamsToDisplay[0].id)}
+            />
+          </div>
+        );
         
       case 2:
-        // Two streams side by side
         return (
           <ResizablePanelGroup 
             direction="horizontal" 
             className="flex-1 mt-2"
-            style={{ direction: "rtl" }}
           >
-            {displayedStreams.map((stream, index) => (
-              <React.Fragment key={stream.id}>
-                {index > 0 && <ResizableHandle withHandle />}
-                <ResizablePanel 
-                  defaultSize={50}
-                  collapsible={false}
-                  minSize={15}
-                  style={{ direction: "ltr" }}
-                >
-                  <div className="relative h-full">
-                    <StreamViewer 
-                      streamId={stream.id} 
-                      streamName={stream.name}
-                      removeStream={() => removeStreamFromView(stream.id)}
-                    />
-                  </div>
-                </ResizablePanel>
-              </React.Fragment>
-            ))}
+            <StreamPanelItem stream={streamsToDisplay[0]} removeStream={removeStreamFromView} />
+            <ResizableHandle withHandle />
+            <StreamPanelItem stream={streamsToDisplay[1]} removeStream={removeStreamFromView} />
           </ResizablePanelGroup>
         );
         
       case 3:
-        // 2 streams on top, 1 on bottom
         return (
           <ResizablePanelGroup 
             direction="vertical" 
             className="flex-1 mt-2"
           >
-            <ResizablePanel 
-              defaultSize={50}
-              collapsible={false}
-              minSize={15}
-            >
+            <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
               <ResizablePanelGroup 
                 direction="horizontal" 
                 className="h-full"
-                style={{ direction: "rtl" }}
               >
-                <ResizablePanel 
-                  defaultSize={50}
-                  collapsible={false}
-                  minSize={15}
-                  style={{ direction: "ltr" }}
-                >
-                  <StreamViewer 
-                    streamId={displayedStreams[0].id} 
-                    streamName={displayedStreams[0].name}
-                    removeStream={() => removeStreamFromView(displayedStreams[0].id)}
-                  />
-                </ResizablePanel>
+                <StreamPanelItem stream={streamsToDisplay[0]} removeStream={removeStreamFromView} />
                 <ResizableHandle withHandle />
-                <ResizablePanel 
-                  defaultSize={50}
-                  collapsible={false}
-                  minSize={15}
-                  style={{ direction: "ltr" }}
-                >
-                  <StreamViewer 
-                    streamId={displayedStreams[1].id} 
-                    streamName={displayedStreams[1].name}
-                    removeStream={() => removeStreamFromView(displayedStreams[1].id)}
-                  />
-                </ResizablePanel>
+                <StreamPanelItem stream={streamsToDisplay[1]} removeStream={removeStreamFromView} />
               </ResizablePanelGroup>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel 
-              defaultSize={50}
-              collapsible={false}
-              minSize={15}
-            >
-              <StreamViewer 
-                streamId={displayedStreams[2].id} 
-                streamName={displayedStreams[2].name}
-                removeStream={() => removeStreamFromView(displayedStreams[2].id)}
-              />
-            </ResizablePanel>
+            <StreamPanelItem stream={streamsToDisplay[2]} removeStream={removeStreamFromView} />
           </ResizablePanelGroup>
         );
         
       case 4:
-        // 2x2 grid layout
         return (
           <ResizablePanelGroup 
             direction="vertical" 
             className="flex-1 mt-2"
           >
-            <ResizablePanel 
-              defaultSize={50}
-              collapsible={false}
-              minSize={15}
-            >
+            <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
               <ResizablePanelGroup 
                 direction="horizontal" 
                 className="h-full"
-                style={{ direction: "rtl" }}
               >
-                <ResizablePanel 
-                  defaultSize={50}
-                  collapsible={false}
-                  minSize={15}
-                  style={{ direction: "ltr" }}
-                >
-                  <StreamViewer 
-                    streamId={displayedStreams[0].id} 
-                    streamName={displayedStreams[0].name}
-                    removeStream={() => removeStreamFromView(displayedStreams[0].id)}
-                  />
-                </ResizablePanel>
+                <StreamPanelItem stream={streamsToDisplay[0]} removeStream={removeStreamFromView} />
                 <ResizableHandle withHandle />
-                <ResizablePanel 
-                  defaultSize={50}
-                  collapsible={false}
-                  minSize={15}
-                  style={{ direction: "ltr" }}
-                >
-                  <StreamViewer 
-                    streamId={displayedStreams[1].id} 
-                    streamName={displayedStreams[1].name}
-                    removeStream={() => removeStreamFromView(displayedStreams[1].id)}
-                  />
-                </ResizablePanel>
+                <StreamPanelItem stream={streamsToDisplay[1]} removeStream={removeStreamFromView} />
               </ResizablePanelGroup>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel 
-              defaultSize={50}
-              collapsible={false}
-              minSize={15}
-            >
+            <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
               <ResizablePanelGroup 
                 direction="horizontal" 
                 className="h-full"
-                style={{ direction: "rtl" }}
               >
-                <ResizablePanel 
-                  defaultSize={50}
-                  collapsible={false}
-                  minSize={15}
-                  style={{ direction: "ltr" }}
-                >
-                  <StreamViewer 
-                    streamId={displayedStreams[2].id} 
-                    streamName={displayedStreams[2].name}
-                    removeStream={() => removeStreamFromView(displayedStreams[2].id)}
-                  />
-                </ResizablePanel>
+                <StreamPanelItem stream={streamsToDisplay[2]} removeStream={removeStreamFromView} />
                 <ResizableHandle withHandle />
-                <ResizablePanel 
-                  defaultSize={50}
-                  collapsible={false}
-                  minSize={15}
-                  style={{ direction: "ltr" }}
-                >
-                  <StreamViewer 
-                    streamId={displayedStreams[3].id} 
-                    streamName={displayedStreams[3].name}
-                    removeStream={() => removeStreamFromView(displayedStreams[3].id)}
-                  />
-                </ResizablePanel>
+                <StreamPanelItem stream={streamsToDisplay[3]} removeStream={removeStreamFromView} />
               </ResizablePanelGroup>
             </ResizablePanel>
           </ResizablePanelGroup>
