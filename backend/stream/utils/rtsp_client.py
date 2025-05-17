@@ -7,6 +7,7 @@ import signal
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 import logging
+import importlib
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -69,6 +70,9 @@ class RTSPClient:
             if self.client_count == 0 and self.is_running:
                 logger.info(f"No clients for {delay}s, stopping stream {self.stream_id}")
                 self._stop_stream()
+                
+                # Signal for cleanup in consumer
+                self.should_be_removed = True
     
     def _stop_stream(self):
         """Internal method to actually stop the stream"""
@@ -87,6 +91,9 @@ class RTSPClient:
         
         # Don't join the thread - let it terminate naturally
         self.thread = None
+        
+        # Signal for cleanup
+        self.should_be_removed = True
     
     def stop(self):
         """External method to force stop the stream regardless of client count"""

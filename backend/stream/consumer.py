@@ -1,15 +1,35 @@
 # streams/consumers.py
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
-from .utils.stream_manager import StreamManager
+from .utils.rtsp_client import RTSPClient
 from .models import Stream
 from asgiref.sync import sync_to_async
 import logging
+import threading
+import asyncio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('rtsp_consumer')
 
+# Simple global dict to track active streams
+active_streams = {}
+streams_lock = threading.Lock()
+
+# Background task to clean up streams that should be removed
+async def cleanup_streams():
+    """Periodically check and remove streams marked for removal"""
+    while True:
+        await asyncio.sleep(5)  # Check every 5 seconds
+        with streams_lock:
+            to_remove = []
+            for stream_id, client in active_streams.items():
+                if hasattr(client, 'should_be_removed') and client.should_be_removed:
+                    to_remove.append(stream_id)
+            
+            for stream_id in to_remove:
+                logger.info(f"Cleanup: Removing stream {stream_id} from active streams")
+                del active_streams[stream_id]
 
 class StreamStatusConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -83,37 +103,60 @@ class RTSPConsumer(AsyncWebsocketConsumer):
         
         try:
             stream = await sync_to_async(Stream.objects.get)(id=self.stream_id, is_active=True)
+            url = stream.url
         except Stream.DoesNotExist:
-            stream = None
-        
-        # If stream exists, add client to existing stream or start a new stream
-        if stream:
-            manager = await sync_to_async(StreamManager)()
-            is_active = await sync_to_async(manager.is_stream_active)(self.stream_id)
-            if is_active:
-                await sync_to_async(manager.add_client_to_stream)(self.stream_id)
-                await self.send(text_data=json.dumps({
-                    'type': 'status',
-                    'message': 'Joining existing stream'
-                }))
-            else:
-                await sync_to_async(manager.start_stream)(
-                    self.stream_id, 
-                    stream.url, 
-                    self.group_name
-                )
-                await self.send(text_data=json.dumps({
-                    'type': 'status',
-                    'message': 'Starting new stream'
-                }))
-        else:
             await self.send(text_data=json.dumps({
                 'type': 'error',
                 'message': 'Stream not found'
             }))
             await self.close()
+            return
+        
+        # Check if stream already exists
+        def manage_stream():
+            with streams_lock:
+                if self.stream_id in active_streams:
+                    # Check if stream is marked for removal
+                    if hasattr(active_streams[self.stream_id], 'should_be_removed') and active_streams[self.stream_id].should_be_removed:
+                        # Create a new instance if it was marked for removal
+                        client = RTSPClient(self.stream_id, url, self.group_name)
+                        active_streams[self.stream_id] = client
+                        client.start()
+                        return "new"
+                    else:
+                        active_streams[self.stream_id].add_client()
+                        return "existing"
+                else:
+                    # Create new RTSP client
+                    client = RTSPClient(self.stream_id, url, self.group_name)
+                    active_streams[self.stream_id] = client
+                    client.start()
+                    return "new"
+
+        # Add client to existing stream or start a new one
+        stream_status = await sync_to_async(manage_stream)()
+        
+        if stream_status == "existing":
+            await self.send(text_data=json.dumps({
+                'type': 'status',
+                'message': 'Joined existing stream'
+            }))
+        else:
+            await self.send(text_data=json.dumps({
+                'type': 'status',
+                'message': 'Started new stream'
+            }))
+            
+        # Make sure cleanup task is running
+        for task in asyncio.all_tasks():
+            if task.get_name() == 'cleanup_streams':
+                break
+        else:
+            # Start cleanup task if not already running
+            cleanup_task = asyncio.create_task(cleanup_streams())
+            cleanup_task.set_name('cleanup_streams')
     
-    async def disconnect(self , close_code):
+    async def disconnect(self, close_code):
         """Handle client disconnection"""
         logger.info(f'Client disconnecting from stream {self.stream_id}')
         
@@ -123,12 +166,16 @@ class RTSPConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         
-        # Notify manager of client departure
-        manager = await sync_to_async(StreamManager)()
-        await sync_to_async(manager.remove_client_from_stream)(self.stream_id)
-        
+        # Remove client from stream
+        def remove_client():
+            with streams_lock:
+                if self.stream_id in active_streams:
+                    client = active_streams[self.stream_id]
+                    client.remove_client()
+                    # Stream cleanup happens automatically inside RTSPClient
+                    
+        await sync_to_async(remove_client)()
         logger.info(f'Client disconnected from stream {self.stream_id}')
-    
     
     async def receive(self, text_data):
         """Handle client sending messages"""
@@ -145,7 +192,6 @@ class RTSPConsumer(AsyncWebsocketConsumer):
         except json.JSONDecodeError:
             pass
     
-
     async def stream_frame(self, event):
         """Send a video frame to the client"""
         try:
