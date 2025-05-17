@@ -55,7 +55,7 @@ class RTSPClient:
         logger.info(f"Starting optimized stream loop for {self.stream_id}")
         
         # Try TCP first as it's more reliable for most RTSP servers
-        transport_types = ['tcp']  
+        transport_types = ['tcp' , 'udp']  
         success = False
         
         # Resource usage optimizations

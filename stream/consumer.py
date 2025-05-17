@@ -19,14 +19,19 @@ active_streams : dict[str, RTSPClient] = {}
 async def cleanup_streams():
     """Periodically check and remove streams marked for removal"""
     while True:
+        logger.info(f"Periodic cleanup of streams")
         await asyncio.sleep(5)  # Check every 5 seconds
         to_remove = []
         for stream_id, client in active_streams.items():
-            if hasattr(client, 'should_be_removed') and client.should_be_removed:
+            if client.client_count == 0:
                 to_remove.append(stream_id)
         
         for stream_id in to_remove:
             logger.info(f"Cleanup: Removing stream {stream_id} from active streams")
+            if active_streams[stream_id]:
+                logger.info(f"Shutting down stream {stream_id} with client count {active_streams[stream_id].client_count}")
+                active_streams[stream_id]._shutdown()
+            logger.info(f"Deleting stream {stream_id} from active streams")
             del active_streams[stream_id]
 
 class RTSPConsumer(AsyncWebsocketConsumer):
@@ -154,59 +159,3 @@ class RTSPConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error sending error to client: {str(e)}")
         
-
-
-# class StreamStatusConsumer(AsyncWebsocketConsumer):
-#     async def connect(self):
-#         # Get the stream_id from URL if provided (optional parameter)
-#         self.stream_id = self.scope['url_route']['kwargs'].get('stream_id', None)
-#         if self.stream_id:
-#             self.group_name = f'status_{self.stream_id}'
-#         else:
-#             self.group_name = 'status'
-        
-#         # Join status group
-#         await self.channel_layer.group_add(
-#             self.group_name,
-#             self.channel_name
-#         )
-        
-#         await self.accept()
-        
-#         # Send initial connection confirmation
-#         await self.send(text_data=json.dumps({
-#             'type': 'connection_established',
-#             'stream_id': self.stream_id,
-#             'status': 'connected'
-#         }))
-    
-#     async def disconnect(self, close_code):
-#         # Leave status group
-#         await self.channel_layer.group_discard(
-#             self.group_name,
-#             self.channel_name
-#         )
-    
-#     async def receive(self, text_data):
-#         try:
-#             text_data_json = json.loads(text_data)
-#             # Handle incoming messages
-#             await self.send(text_data=json.dumps({
-#                 'type': 'status_update',
-#                 'message': 'Received your message',
-#                 'data': text_data_json
-#             }))
-#         except json.JSONDecodeError:
-#             await self.send(text_data=json.dumps({
-#                 'type': 'error',
-#                 'message': 'Invalid JSON'
-#             }))
-    
-#     async def send_stream_metrics(self, event):
-#         # Send FPS/latency data to frontend
-#         await self.send(text_data=json.dumps({
-#             'type': 'stream_metrics',
-#             'stream_id': event.get('stream_id'),
-#             'fps': event.get('fps'),
-#             'status': event.get('status')
-#         }))
