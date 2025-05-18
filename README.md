@@ -132,6 +132,6 @@ Refer to the `Makefile` for commands to run the frontend and backend separately.
     *   Allow user-managed streams (add, configure via UI).
     *   Implement stream discovery/previews.
 *   **Robustness & Reliability:**
-    *   Advanced FFmpeg error handling (monitoring, restarting).
+    *   Use python-bindings for ffmpeg insted of self maanging process. and Advanced FFmpeg error handling (monitoring, restarting).
     *   Graceful degradation for connection/source issues.
     *   Refine connection management for distributed environments.
