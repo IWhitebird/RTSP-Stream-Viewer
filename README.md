@@ -6,6 +6,11 @@ This project allows users to view RTSP streams in their web browser.
 
 The application is built with a React frontend and a Django backend.
 
+### Screenshot
+![Stream View](./assets/rtsp_ss1.png)
+![Stream View](./assets/rtsp_ss2.png)
+
+
 **Frontend:**
 *   **Framework/Libraries:** React, Tailwind CSS, Shadcn/ui
 *   **Build Tool:** Vite
@@ -20,7 +25,7 @@ The application is built with a React frontend and a Django backend.
 *   **WebSocket Stream Handling:** When a user connects to view a stream via WebSocket, the connection's `stream_id` is mapped to an RTSP instance. If another user joins the same `stream_id`, the existing RTSP instance and its processed stream can be broadcast to multiple users. In RTSP instance we use FFmpeg to listen on the RTSP stream.
 *   **MJPEG over Websocket:** Video frames are taken from the RTSP source using FFmpeg, converted to MJPEG format, and then sent to the frontend as bytes through WebSockets. We are making 2 MB chunks here.
 *   **Buffer queue in frontend:** In frontend we are using a buffer queue to store some frames (and not showing immediately). This helps us show smooth stream and get over the inconsistent network delays and failures.
-*   **Note on Performance:** Currently, streams are processed at 30 FPS. This is a deliberate choice to ensure smooth operation on low-compute environments. This can be adjusted in `stream/utils/rtsp_client.py` by changing the `self.fps` attribute and the `fps={self.fps}` value in the FFmpeg command.
+*   **Note on Performance:** Currently, streams are processed at 10 FPS. This is a deliberate choice to ensure smooth operation on low-compute environments. This can be adjusted in `stream/utils/rtsp_client.py` by changing the `self.fps` attribute and the `fps={self.fps}` value in the FFmpeg command.
 *   **Stream Cleanup:** Instead of cleaning up FFmpeg processes immediately when a client disconnects, a periodic task (`cleanup_streams` in `stream/consumer.py`) checks for inactive streams (client_count == 0) and shuts them down. This approach can be more robust in handling abrupt disconnections.
 
 
@@ -32,7 +37,7 @@ The application is built with a React frontend and a Django backend.
 
 ### Using Docker Compose (Recommended)
 
-1.  **Build the Docker image:**
+1.  **Run the Docker image:**
     ```bash
     docker compose up -d
     ```
@@ -54,9 +59,13 @@ If you want to use the provided demo RTSP server:
     ```bash
     docker compose up -d
     ```
-    This will start an RTSP server at `rtsp://localhost:8554/local-loop` streaming a sample video. You can use this URL in the application.
 
-    Alternatively, you can run ffmpeg directly if you have it installed (refer to `local_loop_ffmpeg` in the `Makefile`).
+3. Use this command to stream your local file to rtsp server via ffmpeg
+    ```bash
+    ffmpeg -re -stream_loop -1 -i ./samples/input_files/sample.mp4 -c copy -f rtsp rtsp://localhost:8554/local-loop
+    ```
+
+    This will start an RTSP server at `rtsp://localhost:8554/local-loop` streaming a sample video. You can use this URL in the application.
 
 ### Local Development (Without Docker)
 
@@ -95,9 +104,6 @@ Refer to the `Makefile` for commands to run the frontend and backend separately.
     The frontend will be available at `http://localhost:3000` or a similar port, and will connect to the backend at port 8000.
 
 
-### Screenshot
-![Stream View](./assets/rtsp_ss1.png)
-![Stream View](./assets/rtsp_ss2.png)
 
 ## Project Structure
 
