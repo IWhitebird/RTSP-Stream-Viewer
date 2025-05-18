@@ -6,6 +6,7 @@ import os
 import signal
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+import os
 import logging
 
 # Set up logging
@@ -23,7 +24,7 @@ class RTSPClient:
         self.channel_layer = get_channel_layer()
         self.client_count = 0
         self.last_frame_time = 0
-        self.fps = 15
+        self.fps = 30
         self.frame_buffer = None  # Store last frame for new clients
         
     def start(self):
@@ -98,7 +99,7 @@ class RTSPClient:
                     command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    bufsize=1<<20,  # 1MB buffer
+                    bufsize=5<<20,  # 2MB buffer
                     preexec_fn=os.setsid  # Create new process group
                 )
                 
@@ -126,7 +127,7 @@ class RTSPClient:
         jpeg_start = memoryview(b'\xff\xd8')
         jpeg_end = memoryview(b'\xff\xd9')
         buffer = bytearray()
-        max_buffer_size = 1 * 1024 * 1024  # 2MB max buffer
+        max_buffer_size = 2 * 1024 * 1024  # 1MB max buffer
         
         # Frame rate control
         frame_interval = 1.0 / self.fps
@@ -145,7 +146,7 @@ class RTSPClient:
                     continue
                     
                 # Read from ffmpeg only when we have clients
-                chunk = self.process.stdout.read(65536)
+                chunk = self.process.stdout.read(65536 * 2)
                 if not chunk:
                     if self.process.poll() is not None:
                         break
@@ -178,7 +179,8 @@ class RTSPClient:
                     
                     if elapsed >= frame_interval:
                         # Encode and cache the frame
-                        encoded = base64.b64encode(frame).decode('ascii')
+                        # encoded = base64.b64encode(frame).decode('ascii')
+                        encoded = frame
                         self.frame_buffer = encoded
                         # Only send if we have clients
                         if has_clients:
@@ -231,8 +233,8 @@ class RTSPClient:
                 self.group_name,
                 {
                     "type": "stream_frame",
-                    "frame": encoded_frame,
-                    "stream_id": self.stream_id
+                    "frame": bytes(encoded_frame),
+                    # "stream_id": self.stream_id
                 }
             )
             self.last_frame_time = time.time()

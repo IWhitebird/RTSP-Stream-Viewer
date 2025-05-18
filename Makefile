@@ -4,7 +4,7 @@ run: run_backend run_frontend
 
 run_backend:
 	fuser -k 8000/tcp || true
-	$(PYTHON) manage.py runserver &
+	$(PYTHON) manage.py runserver 0.0.0.0:8000 &
 
 run_frontend:
 	fuser -k 3000/tcp || true

@@ -29,7 +29,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   //Put data frames in a queue so we show smooth video.
-  const [, setFrameQueue] = useState<string[]>([]);
+  const [, setFrameQueue] = useState<Uint8Array[]>([]);
   const [currentFrame, setCurrentFrame] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -38,7 +38,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   const wsRef = useRef<WebSocket | null>(null);
   const frameTimesRef = useRef<number[]>([]);
 
-  const STREAM_FRAMES = useRef(15);
+  const STREAM_FRAMES = useRef(30);
 
   useEffect(() => {
     connectWebSocket();
@@ -47,21 +47,51 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
     };
   }, []);
 
+  // useEffect(() => {
+  //   if (isPaused) return;
+  
+  //   const interval = setInterval(() => {
+  //     setFrameQueue(prevQueue => {
+  //       if (prevQueue.length < 1) return prevQueue;
+  
+  //       const [nextFrame, ...rest] = prevQueue;
+  //       setCurrentFrame(nextFrame);
+  //       return rest;
+  //     });
+  //   }, 1000 / STREAM_FRAMES.current);
+  
+  //   return () => clearInterval(interval);
+  // }, []);
+  
+
   useEffect(() => {
     if (isPaused) return;
+  
+    let objectUrl: string | null = null;
   
     const interval = setInterval(() => {
       setFrameQueue(prevQueue => {
         if (prevQueue.length < 1) return prevQueue;
   
         const [nextFrame, ...rest] = prevQueue;
-        setCurrentFrame(nextFrame);
+  
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+  
+        const blob = new Blob([nextFrame], { type: 'image/jpeg' });
+        objectUrl = URL.createObjectURL(blob);
+        setCurrentFrame(objectUrl);
+  
         return rest;
       });
     }, 1000 / STREAM_FRAMES.current);
   
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [isPaused]);
   
 
   const connectWebSocket = () => {
@@ -83,24 +113,44 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
       frameTimesRef.current = [];
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       try {
-        const data: StreamFrame = JSON.parse(event.data);
-        
-        if (data.type === 'stream_frame' && data.frame) {
+        // Check if the data is a Blob (which it is, based on your log)
+        if (event.data instanceof Blob) {
+          const buffer = await event.data.arrayBuffer(); // Read Blob as ArrayBuffer
+          const bytes = new Uint8Array(buffer);
           setFrameQueue(prevQueue => {
-            const newQueue = [...prevQueue, data.frame!];
-            // Optional: Limit queue length to prevent memory bloating
-            if (newQueue.length > STREAM_FRAMES.current) newQueue.shift();
+            const newQueue = [...prevQueue, bytes];
+            if (newQueue.length > STREAM_FRAMES.current * 2) newQueue.shift();
             return newQueue;
           });
-        } else if (data.type === 'stream_error' && data.message) {
-          setError(data.message);
+        } else {
+          // Optional: Try to parse as JSON to distinguish between binary and text frame
+          try {
+            const data: StreamFrame = JSON.parse(event.data);
+    
+            if (data?.type === 'stream_frame' && data.frame) {
+              // Process JSON stream frame if needed
+              // Example:
+              // setFrameQueue(prevQueue => {
+              //   const newQueue = [...prevQueue, data.frame];
+              //   if (newQueue.length > STREAM_FRAMES.current) newQueue.shift();
+              //   return newQueue;
+              // });
+            } else if (data.type === 'stream_error' && data.message) {
+              setError(data.message);
+            }
+          } catch {
+            // Not JSON, treat as raw binary frame
+            setError("Error parsing frame");
+          }
+    
         }
       } catch (err) {
         console.error('Failed to parse WebSocket message:', err);
       }
     };
+    
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
@@ -183,8 +233,14 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
           onMouseLeave={() => setShowControls(false)}
         >
           {currentFrame && !isPaused ? (
+            // <img
+            //   src={`data:image/jpeg;base64,${currentFrame}`}
+            //   alt="RTSP Stream"
+            //   className="max-w-full max-h-full object-contain"
+            // />
             <img
-              src={`data:image/jpeg;base64,${currentFrame}`}
+              // src={`data:image/jpeg;${currentFrame}`}
+              src={currentFrame ? currentFrame : ''}
               alt="RTSP Stream"
               className="max-w-full max-h-full object-contain"
             />

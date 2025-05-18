@@ -129,11 +129,12 @@ class RTSPConsumer(AsyncWebsocketConsumer):
     async def stream_frame(self, event):
         """Send a video frame to the client"""
         try:
-            await self.send(text_data=json.dumps({
-                'type': 'stream_frame',
-                'frame': event['frame'],
-                'stream_id': event['stream_id']
-            }))
+            # await self.send(text_data=json.dumps({
+            #     'type': 'stream_frame',
+            #     'frame': event['frame'],
+            #     'stream_id': event['stream_id']
+            # }))
+            await self.send(bytes_data=event['frame'])
         except Exception as e:
             logger.error(f"Error sending frame to client: {str(e)}")
     
