@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SOCKET_BASE_URL } from '@/config';
 
 interface StreamViewerProps {
   streamId: string;
@@ -22,7 +23,7 @@ interface StreamFrame {
 const StreamViewer: React.FC<StreamViewerProps> = ({ 
   streamId, 
   streamName,
-  baseUrl = 'ws://localhost:8000/ws',
+  baseUrl = SOCKET_BASE_URL,
   removeStream
 }) => {
   const [isConnected, setIsConnected] = useState(false);

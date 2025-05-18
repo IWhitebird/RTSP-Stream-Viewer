@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_BASE_URL } from '@/cofig';
+import { API_BASE_URL } from '@/config';
 import type { Stream } from '@/query/stream';
 
 // API functions
