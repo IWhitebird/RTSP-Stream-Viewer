@@ -20,7 +20,7 @@ async def cleanup_streams():
     """Periodically check and remove streams marked for removal"""
     while True:
         logger.info(f"Periodic cleanup of streams")
-        await asyncio.sleep(5)  # Check every 5 seconds
+        await asyncio.sleep(30)  # Check every 5 seconds
         to_remove = []
         for stream_id, client in active_streams.items():
             if client.client_count == 0:
