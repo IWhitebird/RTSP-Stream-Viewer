@@ -24,7 +24,7 @@ const StreamPanelItem: React.FC<{ stream: Stream | undefined; removeStream: (str
     // This case should ideally not be hit if streamsToDisplay is managed correctly
     return (
       <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
-        <div className="relative h-full p-1 flex items-center justify-center text-muted-foreground">
+        <div className="relative h-full w-full p-1 flex items-center justify-center text-muted-foreground">
           Empty Panel
         </div>
       </ResizablePanel>
@@ -32,7 +32,7 @@ const StreamPanelItem: React.FC<{ stream: Stream | undefined; removeStream: (str
   }
   return (
     <ResizablePanel defaultSize={50} collapsible={false} minSize={15} key={stream.id /* Add key here if mapping, or ensure parent does it */}>
-      <div className="relative h-full p-1">
+      <div className="relative h-full w-full p-1">
         <StreamViewer
           streamId={stream.id}
           streamName={stream.name}
@@ -117,7 +117,7 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
     switch (streamsToDisplay.length) {
       case 1:
         return (
-          <div className="flex-1 mt-2 h-full">
+          <div className="h-full w-full mt-2">
             <StreamViewer 
               streamId={streamsToDisplay[0].id} 
               streamName={streamsToDisplay[0].name}
@@ -130,7 +130,7 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
         return (
           <ResizablePanelGroup 
             direction="horizontal" 
-            className="flex-1 mt-2"
+            className="h-full w-full mt-2"
           >
             <StreamPanelItem stream={streamsToDisplay[0]} removeStream={removeStreamFromView} />
             <ResizableHandle withHandle />
@@ -142,12 +142,12 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
         return (
           <ResizablePanelGroup 
             direction="vertical" 
-            className="flex-1 mt-2"
+            className="h-full w-full mt-2"
           >
             <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
               <ResizablePanelGroup 
                 direction="horizontal" 
-                className="h-full"
+                className="h-full w-full"
               >
                 <StreamPanelItem stream={streamsToDisplay[0]} removeStream={removeStreamFromView} />
                 <ResizableHandle withHandle />
@@ -163,12 +163,12 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
         return (
           <ResizablePanelGroup 
             direction="vertical" 
-            className="flex-1 mt-2"
+            className="h-full w-full mt-2"
           >
             <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
               <ResizablePanelGroup 
                 direction="horizontal" 
-                className="h-full"
+                className="h-full w-full"
               >
                 <StreamPanelItem stream={streamsToDisplay[0]} removeStream={removeStreamFromView} />
                 <ResizableHandle withHandle />
@@ -179,7 +179,7 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
             <ResizablePanel defaultSize={50} collapsible={false} minSize={15}>
               <ResizablePanelGroup 
                 direction="horizontal" 
-                className="h-full"
+                className="h-full w-full"
               >
                 <StreamPanelItem stream={streamsToDisplay[2]} removeStream={removeStreamFromView} />
                 <ResizableHandle withHandle />
@@ -196,7 +196,7 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
 
   return (
     <>
-      <div className="p-4 bg-background h-full flex flex-col">
+      <div className="p-4 bg-background h-full w-full flex flex-col">
         {layoutError && (
           <Alert variant="destructive" className="mb-2">
             <AlertCircle className="h-4 w-4" />
@@ -208,7 +208,9 @@ const StreamViewPanel: React.FC<StreamViewPanelProps> = ({
         {displayedStreams.length > 0 ? (
           <>
             <h3 className="text-sm font-medium">Displayed Streams ({displayedStreams.length}/4)</h3>
-            {renderStreamLayout()}
+            <div className="flex-1 h-full w-full overflow-hidden">
+              {renderStreamLayout()}
+            </div>
           </>
         ) : (
           <NoStreamsView />

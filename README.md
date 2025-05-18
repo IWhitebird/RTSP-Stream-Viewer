@@ -12,15 +12,15 @@ The application is built with a React frontend and a Django backend.
 
 **Backend:**
 *   **Framework:** Django, Django REST Framework (for APIs)
-*   **WebSockets:** Django Channels with Daphne.
-*   **RTSP Processing:** FFmpeg is used to connect to RTSP streams, convert them to MJPEG, and then stream the data as base64 encoded strings over WebSockets to the frontend. Each FFmpeg instance runs as a separate subprocess.
+*   **WebSockets:** Django Channels with Daphne
+*   **RTSP Processing:** FFmpeg is used to connect to RTSP streams, convert them to MJPEG, and we send it to frontend in chunks of 2MB. And at frontend we queue this in a frame queue for smoothly showing the video.
 
 ## Key Features & Approach
-*   **Create Multiple Streams:** User can create multiple streams using rtmp url.
-*   **WebSocket Stream Handling:** When a user connects to view a stream via WebSocket, the connection's `stream_id` is mapped to an RTSP instance. If another user joins the same `stream_id`, the existing RTSP instance and its processed stream can be broadcast to multiple users. In RTSP instance we use FFmpeg to listen on the rtsp stream .
-*   **MJPEG over Base64:** Video frames are taken from the RTSP source using FFmpeg, converted to MJPEG format, and then sent to the frontend as base64 encoded strings through WebSockets. we are also chunking the bytes (1 MB chunks) so we can send alot at onec appoorx we send per 1 sec .
-*   **Buffer queue in frontend:** In frontend we are using a buffer queue to store some frames (and not showing immdiatly). this helps us show smooth stream and get over the inconsistant network delays and failures.
-*   **Note on Performance:** Currently, streams are processed at approximately 15 FPS. This is a deliberate choice to ensure smooth operation on low-compute environments. This can be adjusted in `stream/utils/rtsp_client.py` by changing the `self.fps` attribute and the `fps={self.fps}` value in the FFmpeg command.
+*   **Create Multiple Streams:** Users can create multiple streams using RTSP URLs.
+*   **WebSocket Stream Handling:** When a user connects to view a stream via WebSocket, the connection's `stream_id` is mapped to an RTSP instance. If another user joins the same `stream_id`, the existing RTSP instance and its processed stream can be broadcast to multiple users. In RTSP instance we use FFmpeg to listen on the RTSP stream.
+*   **MJPEG over Websocket:** Video frames are taken from the RTSP source using FFmpeg, converted to MJPEG format, and then sent to the frontend as bytes through WebSockets. We are making 2 MB chunks here.
+*   **Buffer queue in frontend:** In frontend we are using a buffer queue to store some frames (and not showing immediately). This helps us show smooth stream and get over the inconsistent network delays and failures.
+*   **Note on Performance:** Currently, streams are processed at 30 FPS. This is a deliberate choice to ensure smooth operation on low-compute environments. This can be adjusted in `stream/utils/rtsp_client.py` by changing the `self.fps` attribute and the `fps={self.fps}` value in the FFmpeg command.
 *   **Stream Cleanup:** Instead of cleaning up FFmpeg processes immediately when a client disconnects, a periodic task (`cleanup_streams` in `stream/consumer.py`) checks for inactive streams (client_count == 0) and shuts them down. This approach can be more robust in handling abrupt disconnections.
 
 
@@ -34,7 +34,7 @@ The application is built with a React frontend and a Django backend.
 
 1.  **Build the Docker image:**
     ```bash
-    docker compose up -
+    docker compose up -d
     ```
 
     The application will be accessible at `http://localhost:8000`.
@@ -60,7 +60,7 @@ If you want to use the provided demo RTSP server:
 
 ### Local Development (Without Docker)
 
-Refer to the `Makefile` for commands to run the frontend and backend separately. You'll need Python (with `uv` for package management and a virtual enviroment), Node.js (with `bun` for the frontend), and `ffmpeg` installed on your system.
+Refer to the `Makefile` for commands to run the frontend and backend separately. You'll need Python (with `uv` for package management and a virtual environment), Node.js (with `bun` for the frontend), and `ffmpeg` installed on your system.
 
 1.  **Install backend dependencies:**
     ```bash
@@ -96,8 +96,8 @@ Refer to the `Makefile` for commands to run the frontend and backend separately.
 
 
 ### Screenshot
-<!-- ![Main Interface](./assets/main_interface.png) -->
-<!-- ![Stream View](./assets/stream_view.png) -->
+![Stream View](./assets/rtsp_ss1.png)
+![Stream View](./assets/rtsp_ss2.png)
 
 ## Project Structure
 
@@ -113,7 +113,7 @@ Refer to the `Makefile` for commands to run the frontend and backend separately.
 ├── manage.py           # Django's command-line utility
 ├── pyproject.toml      # Python project metadata and dependencies
 ├── rtsppy/             # Main Django project directory
-├── stream/             # Django app for stream handling rtsp and stream releted api's
+├── stream/             # Django app for stream handling RTSP and stream related APIs
 ├── ui/                 # Frontend React application
 
 ```
@@ -124,7 +124,8 @@ Refer to the `Makefile` for commands to run the frontend and backend separately.
     *   Externalize `active_streams` (e.g., Redis) for horizontal scaling.
     *   Implement distributed task queues (e.g., Celery, Django Q).
 *   **Performance Optimization:**
-    *   Use binary WebSocket payloads (ArrayBuffer) instead of Base64.
+    *   Use more optimal frame queue in frontend and handle FPS automatically.
+    *   Adjust FPS with respect to load on server.
     *   Tune FFmpeg: dynamic parameters, explore alternatives (WebRTC, HLS, DASH).
 *   **User Experience & Features:**
     *   Improve multi-stream display (tiling/grid layout).

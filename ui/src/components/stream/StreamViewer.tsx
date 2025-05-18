@@ -2,9 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardDescription, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, Activity, X } from 'lucide-react';
+import { Play, Pause, RefreshCw, Maximize, Minimize, Video, VideoOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ResizablePanel } from "../ui/resizable";
 
 interface StreamViewerProps {
   streamId: string;
@@ -46,23 +45,6 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
       disconnectWebSocket();
     };
   }, []);
-
-  // useEffect(() => {
-  //   if (isPaused) return;
-  
-  //   const interval = setInterval(() => {
-  //     setFrameQueue(prevQueue => {
-  //       if (prevQueue.length < 1) return prevQueue;
-  
-  //       const [nextFrame, ...rest] = prevQueue;
-  //       setCurrentFrame(nextFrame);
-  //       return rest;
-  //     });
-  //   }, 1000 / STREAM_FRAMES.current);
-  
-  //   return () => clearInterval(interval);
-  // }, []);
-  
 
   useEffect(() => {
     if (isPaused) return;
@@ -131,12 +113,6 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
     
             if (data?.type === 'stream_frame' && data.frame) {
               // Process JSON stream frame if needed
-              // Example:
-              // setFrameQueue(prevQueue => {
-              //   const newQueue = [...prevQueue, data.frame];
-              //   if (newQueue.length > STREAM_FRAMES.current) newQueue.shift();
-              //   return newQueue;
-              // });
             } else if (data.type === 'stream_error' && data.message) {
               setError(data.message);
             }
@@ -171,11 +147,6 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   };
 
   const handleReconnect = () => {
-    // setFrameQueue([]);
-    // setCurrentFrame(null);
-    // setIsConnected(false);
-    // setError(null);
-    // disconnectWebSocket();
     connectWebSocket();
   };
 
@@ -219,30 +190,25 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   }, []);
 
   return (
-    <ResizablePanel defaultSize={100}>
+    <div className="h-full w-full">
       <Card 
         ref={cardRef} 
         className={cn(
-          "min-w-full min-h-full transition-all overflow-hidden border-none ", 
+          "w-full h-full transition-all overflow-hidden border-none",
           isFullscreen ? "fixed inset-0 z-50 rounded-none" : ""
         )}
       >
         <div 
-          className="relative flex items-center justify-center h-full w-full overflow-hidden aspect-video "
+          className="relative flex items-center justify-center w-full h-full overflow-hidden"
           onMouseEnter={() => setShowControls(true)}
           onMouseLeave={() => setShowControls(false)}
         >
           {currentFrame && !isPaused ? (
-            // <img
-            //   src={`data:image/jpeg;base64,${currentFrame}`}
-            //   alt="RTSP Stream"
-            //   className="max-w-full max-h-full object-contain"
-            // />
             <img
-              // src={`data:image/jpeg;${currentFrame}`}
               src={currentFrame ? currentFrame : ''}
               alt="RTSP Stream"
-              className="max-w-full max-h-full object-contain"
+              className="w-auto h-auto max-w-full max-h-full object-contain"
+              style={{ objectFit: 'contain' }}
             />
           ) : (
             <div className="flex flex-col items-center justify-center text-center text-foreground/50 p-4 w-full h-full">
@@ -283,12 +249,6 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {/* {STREAM_FRAMES.current !== null && isConnected && !isPaused && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <Activity className="h-3 w-3" />
-                    <span>{STREAM_FRAMES.current} FPS</span>
-                  </Badge>
-                )} */}
                 <Badge 
                   variant={isConnected ? "success" : "destructive"}
                 >
@@ -326,7 +286,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
           </div>
         </div>
       </Card>
-    </ResizablePanel>
+    </div>
   );
 };
 
