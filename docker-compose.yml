@@ -3,6 +3,7 @@ version: '3.8'
 services:
   app:
     build:
+      image: iwhitebird/rtsp-stream-app:latest
       context: .
       dockerfile: Dockerfile
     ports:
