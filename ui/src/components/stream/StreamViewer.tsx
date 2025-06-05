@@ -38,7 +38,7 @@ const StreamViewer: React.FC<StreamViewerProps> = ({
   const wsRef = useRef<WebSocket | null>(null);
   const frameTimesRef = useRef<number[]>([]);
 
-  const STREAM_FRAMES = useRef(10);
+  const STREAM_FRAMES = useRef(30);
 
   useEffect(() => {
     connectWebSocket();

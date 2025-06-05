@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchStreams, createStream, toggleStreamActive, deleteStream } from '@/api/stream';
+import { fetchStreams, createStream, toggleStreamActive, deleteStream, updateStream } from '@/api/stream';
 
 export interface Stream {
   id: string;
@@ -8,6 +8,13 @@ export interface Stream {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface UpdateStreamPayload {
+  id: string;
+  name: string;
+  url: string;
+  is_active: boolean;
 }
 
 export const useStreams = () => {
@@ -28,6 +35,21 @@ export const useCreateStream = () => {
     }
   });
 };
+
+export const useUpdateStream = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation<Stream, Error, UpdateStreamPayload>({
+    mutationFn: async (payload: UpdateStreamPayload) => {
+      const { id, ...data } = payload;
+      return updateStream(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+    }
+  });
+};
+
 
 export const useToggleStreamActive = () => {
   const queryClient = useQueryClient();
@@ -50,3 +72,4 @@ export const useDeleteStream = () => {
     }
   });
 };
+

@@ -41,9 +41,9 @@ urlpatterns = [
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
 
-    # Static files (JS, CSS, etc.)
-    re_path(r'^assets/(?P<path>.*)$', serve, {'document_root': os.path.join(FRONTEND_DIST, 'assets')}),
+    # # Static files (JS, CSS, etc.)
+    # re_path(r'^assets/(?P<path>.*)$', serve, {'document_root': os.path.join(FRONTEND_DIST, 'assets')}),
 
-    # Catch-all route to serve index.html for React SPA
-    re_path(r'^.*$', serve, {'path': 'index.html', 'document_root': FRONTEND_DIST}),
+    # # Catch-all route to serve index.html for React SPA
+    # re_path(r'^.*$', serve, {'path': 'index.html', 'document_root': FRONTEND_DIST}),
 ]

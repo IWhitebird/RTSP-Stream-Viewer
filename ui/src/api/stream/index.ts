@@ -8,10 +8,14 @@ export const fetchStreams = async (): Promise<Stream[]> => {
   const response = await axios.get(`${API_BASE_URL}/api/streams/`);
   return response.data.results;
 };
-// /rtsp://172.20.14.95:8554/city-traffic
+
 export const createStream = async (data: { name: string; url: string; is_active: boolean }): Promise<Stream> => {
-  console.log('createStream', data);
   const response = await axios.post(`${API_BASE_URL}/api/streams/`, data);
+  return response.data;
+};
+
+export const updateStream = async (streamId: string, data: { name: string; url: string; is_active: boolean }): Promise<Stream> => {
+  const response = await axios.patch(`${API_BASE_URL}/api/streams/${streamId}/`, data);
   return response.data;
 };
 
@@ -24,3 +28,4 @@ export const toggleStreamActive = async ({ streamId, activate }: { streamId: str
 export const deleteStream = async (streamId: string): Promise<void> => {
   await axios.delete(`${API_BASE_URL}/api/streams/${streamId}/`);
 };
+

@@ -31,7 +31,7 @@ const StreamManager: React.FC = () => {
       ) : (
         <ResizablePanelGroup direction="horizontal" className="h-full rounded-lg border">
           
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-card">
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
             <StreamList 
               streams={streams}
               onRefresh={refetch}
