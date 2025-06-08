@@ -23,7 +23,7 @@ class RTSPClient:
         self.channel_layer = get_channel_layer()
         self.client_count = 0
         self.last_frame_time = 0
-        self.fps = 30
+        self.fps = 15
         self.frame_buffer = None
         self.face_detector = MTCNNDetector()
         
